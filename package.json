@@ -5,7 +5,7 @@
   "main": "cli.js",
   "type": "module",
   "bin": {
-    "dlasm": "./cli.js"
+    "ses-pilot": "./cli.js"
   },
   "scripts": {
     "start": "node ./cli.js"
