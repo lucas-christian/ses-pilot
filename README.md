@@ -20,12 +20,12 @@ Instale globalmente e gerencie seus templates de e-mail em qualquer projeto, dir
 
 ## Instalação
 
-Instale o `dlasm` globalmente através do NPM. Isso tornará o comando `dlasm` disponível em qualquer lugar no seu sistema.
+Instale o `ses-pilot` globalmente através do NPM. Isso tornará o comando `ses-pilot` disponível em qualquer lugar no seu sistema.
 
 ```bash
-npm install -g dlasm
+npm install -g ses-pilot
 ```
-*(Nota: O nome `dlasm` pode já estar em uso no NPM. Se estiver, você precisará escolher um nome único no seu `package.json` antes de publicar.)*
+*(Nota: O nome `ses-pilot` pode já estar em uso no NPM. Se estiver, você precisará escolher um nome único no seu `package.json` antes de publicar.)*
 
 ## Como Usar
 
@@ -36,11 +36,11 @@ npm install -g dlasm
     ```
 2.  Execute o comando:
     ```bash
-    dlasm
+    ses-pilot
     ```
     ou
     ```bash
-    npx dlasm
+    npx ses-pilot
     ```
 3.  O menu principal será exibido.
 
@@ -52,7 +52,7 @@ npm install -g dlasm
 
 ### Gerenciando Templates Existentes
 
--   Execute `dlasm` na pasta que contém seus diretórios de template.
+-   Execute `ses-pilot` na pasta que contém seus diretórios de template.
 -   A lista de templates existentes aparecerá no menu principal.
 -   Selecione um template para ver as ações disponíveis (Criar/Atualizar na AWS, Enviar Teste, etc.).
 
