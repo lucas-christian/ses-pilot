@@ -1,6 +1,6 @@
 {
   "name": "@dev-luch/ses-pilot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A CLI tool to manage AWS SES email templates. (Dev Luch AWS SES Manager)",
   "main": "cli.js",
   "type": "module",
