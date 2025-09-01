@@ -1,6 +1,6 @@
 # dlasm - Dev Luch AWS SES Manager
 
-![npm](https://img.shields.io/npm/v/dlasm) **dlasm** (acrônimo para **Dev Luch AWS SES Manager**) é uma ferramenta de linha de comando (CLI) interativa projetada para acelerar e simplificar o fluxo de trabalho de criação, gerenciamento e deploy de templates de e-mail no AWS Simple Email Service (SES).
+![npm](https://img.shields.io/npm/v/@dev-luch/ses-pilot) **dlasm** (acrônimo para **Dev Luch AWS SES Manager**) é uma ferramenta de linha de comando (CLI) interativa projetada para acelerar e simplificar o fluxo de trabalho de criação, gerenciamento e deploy de templates de e-mail no AWS Simple Email Service (SES).
 
 Instale globalmente e gerencie seus templates de e-mail em qualquer projeto, diretamente do seu terminal.
 
