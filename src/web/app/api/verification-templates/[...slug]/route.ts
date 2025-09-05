@@ -1,0 +1,220 @@
+import { NextResponse } from 'next/server';
+import { deleteTemplate, getTemplateDetails, updateTemplate } from '@/lib/file-system';
+import { getTemplatesPath } from '@/lib/config';
+import { deployTemplate, getRemoteTemplateContent } from '@/lib/aws';
+import fs from 'fs-extra';
+import path from 'path';
+
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ slug: string[] }> }
+) {
+  const { slug } = await params;
+  const templatesPath = await getTemplatesPath();
+
+  if (!templatesPath) {
+    return NextResponse.json(
+      { error: 'O caminho para os templates não está configurado.' },
+      { status: 500 }
+    );
+  }
+
+  try {
+    // Para templates de verificação, adiciona o prefixo _verification
+    const verificationPath = [...slug];
+    const details = await getTemplateDetails(templatesPath, ['_verification', ...verificationPath]);
+    return NextResponse.json(details);
+  } catch (error: unknown) {
+    // Se o erro for "Template not found", retornamos um 404
+    if ((error as { message?: string; }).message === 'Template not found') {
+        return NextResponse.json({ error: 'Template de verificação não encontrado.' }, { status: 404 });
+    }
+    
+    // Para outros erros, é um problema no servidor
+    return NextResponse.json(
+      { error: 'Falha ao ler os detalhes do template de verificação.', details: (error as { message?: string; }).message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(request: Request, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params;
+  const templatesPath = await getTemplatesPath();
+  if (!templatesPath) {
+    return NextResponse.json(
+      { error: 'O caminho para os templates não está configurado.' },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const body = await request.json();
+    // Para templates de verificação, adiciona o prefixo _verification
+    await updateTemplate(templatesPath, ['_verification', ...slug], body);
+    return NextResponse.json({ message: 'Template de verificação salvo com sucesso.' });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: 'Falha ao salvar o template de verificação.', details: (error as { message?: string }).message }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request, { params }: { params: Promise<{ slug: string[] }> }) {
+  const { slug } = await params;
+  const templatesPath = await getTemplatesPath();
+  
+  if (!templatesPath) {
+    return NextResponse.json(
+      { error: 'O caminho para os templates não está configurado.' },
+      { status: 500 }
+    );
+  }
+
+  try {
+    const url = new URL(request.url);
+    const action = url.searchParams.get('action');
+    
+    if (action === 'test-email') {
+      // Envio de e-mail de teste de verificação
+      const body = await request.json();
+      const { email } = body;
+
+      if (!email) {
+        return NextResponse.json(
+          { error: 'E-mail de destino é obrigatório.' },
+          { status: 400 }
+        );
+      }
+
+      // Validação básica de e-mail
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return NextResponse.json(
+          { error: 'E-mail inválido.' },
+          { status: 400 }
+        );
+      }
+
+      // Carrega os detalhes do template de verificação
+      const verificationPath = [...slug];
+      const templateDetails = await getTemplateDetails(templatesPath, ['_verification', ...verificationPath]);
+      
+      if (!templateDetails) {
+        return NextResponse.json(
+          { error: 'Template de verificação não encontrado.' },
+          { status: 404 }
+        );
+      }
+
+      // Prepara o payload para envio de teste de verificação
+      const testEmailPayload = {
+        Destination: {
+          ToAddresses: [email]
+        },
+        Message: {
+          Body: {
+            Html: {
+              Charset: 'UTF-8',
+              Data: templateDetails.htmlContent || ''
+            }
+          },
+          Subject: {
+            Charset: 'UTF-8',
+            Data: templateDetails.templateJson?.Template?.SubjectPart || 'Teste de E-mail de Verificação'
+          }
+        },
+        Source: process.env.AWS_SES_FROM_EMAIL || 'noreply@example.com'
+      };
+
+      // Salva o payload em arquivo temporário
+      const { execa } = await import('execa');
+      const fs = await import('fs-extra');
+      const path = await import('path');
+      const os = await import('os');
+      
+      const tempJsonPath = path.join(os.tmpdir(), `ses-test-verification-email-${Date.now()}.json`);
+      await fs.writeJson(tempJsonPath, testEmailPayload);
+
+      try {
+        // Envia o e-mail de teste usando AWS CLI
+        console.log(`Enviando e-mail de teste de verificação para: ${email}`);
+        await execa('aws', ['sesv2', 'send-email', '--cli-input-json', `file://${tempJsonPath}`]);
+        
+        return NextResponse.json({ 
+          success: true, 
+          message: 'E-mail de teste de verificação enviado com sucesso!' 
+        });
+      } catch (error: unknown) {
+        console.error("Erro ao enviar e-mail de teste de verificação:", error);
+        const errorMessage = (error as { stderr?: string; message?: string }).stderr || (error as { message?: string }).message || '';
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'Falha ao enviar e-mail de teste de verificação.', 
+            details: errorMessage 
+          },
+          { status: 500 }
+        );
+      } finally {
+        // Remove o arquivo temporário
+        await fs.remove(tempJsonPath);
+      }
+    } else if (action === 'deploy') {
+      // Deploy do template de verificação
+      const templateDetails = await getTemplateDetails(templatesPath, ['_verification', ...slug]);
+      await deployTemplate({
+        htmlContent: templateDetails.htmlContent,
+        templateJson: templateDetails.templateJson
+      });
+      return NextResponse.json({ message: 'Template de verificação implantado com sucesso.' });
+    } else if (action === 'pull') {
+      // Pull do template de verificação da AWS
+      const templateName = slug[0];
+      const remoteContent = await getRemoteTemplateContent(templateName);
+      
+      const templatePath = path.join(templatesPath, '_verification', templateName);
+      const jsonPath = path.join(templatePath, 'verification-template.json');
+      const htmlPath = path.join(templatePath, 'template.html');
+      
+      const templateJson = {
+        Template: {
+          TemplateName: templateName,
+          SubjectPart: remoteContent.Subject,
+        }
+      };
+      
+      await fs.writeFile(htmlPath, remoteContent.Html);
+      await fs.writeJson(jsonPath, templateJson, { spaces: 2 });
+      
+      return NextResponse.json({
+        htmlContent: remoteContent.Html,
+        templateJson: templateJson
+      });
+    } else {
+      return NextResponse.json({ error: 'Ação não reconhecida.' }, { status: 400 });
+    }
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { error: 'Falha na operação.', details: (error as { message?: string; }).message },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: Request, { params }: { params: Promise<{ slug: string[] }> }) {
+    const { slug } = await params;
+    const templatesPath = await getTemplatesPath();
+    if (!templatesPath) {
+      return NextResponse.json(
+        { error: 'O caminho para os templates não está configurado.' },
+        { status: 500 }
+      );
+    }
+
+    try {
+        // Para templates de verificação, adiciona o prefixo _verification
+        await deleteTemplate(templatesPath, ['_verification', ...slug]);
+        return NextResponse.json({ message: 'Template de verificação deletado com sucesso.' }, { status: 200 });
+    } catch (error: unknown) {
+        return NextResponse.json({ error: 'Falha ao deletar o template de verificação.', details: (error as { message?: string }).message }, { status: 500 });
+    }
+}
