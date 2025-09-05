@@ -2,13 +2,29 @@
   "name": "@dev-luch/ses-pilot",
   "version": "1.0.1",
   "description": "A CLI tool to manage AWS SES email templates. (Dev Luch AWS SES Manager)",
-  "main": "cli.js",
+  "private": true,
   "type": "module",
+  "workspaces": [
+    "src/web"
+  ],
   "bin": {
-    "ses-pilot": "./cli.js"
+    "ses-pilot": "dist/index.js"
   },
+  "main": "dist/index.js",
+  "files": [
+    "dist",
+    "src/web/.next",
+    "src/web/public",
+    "src/web/next.config.js"
+  ],
   "scripts": {
-    "start": "node ./cli.js"
+    "dev:cli": "tsx src/cli/index.ts",
+    "dev:web": "npm run dev --workspace=src/web",
+    "dev": "concurrently \"npm:dev:cli\" \"npm:dev:web\"",
+    "build:cli": "tsc --project tsconfig.cli.json",
+    "build:web": "npm run build --workspace=src/web",
+    "build": "npm run build:cli && npm run build:web",
+    "start": "node dist/index.js"
   },
   "keywords": [
     "aws",
@@ -20,13 +36,19 @@
   ],
   "author": "dev-luch",
   "license": "ISC",
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^24.3.0",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
   "dependencies": {
     "chalk": "^5.6.0",
+    "commander": "^14.0.0",
     "execa": "^9.6.0",
     "fs-extra": "^11.3.1",
-    "html-minifier-terser": "^7.2.0",
     "inquirer": "^12.9.4",
-    "open": "^10.2.0",
-    "os-locale": "^6.0.2"
+    "portfinder": "^1.0.37"
   }
 }
