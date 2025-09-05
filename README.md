@@ -1,74 +1,209 @@
-# dlasm - Dev Luch AWS SES Manager
+# 🚀 SES Pilot - Gerenciador de Templates Amazon SES
 
-![npm](https://img.shields.io/npm/v/@dev-luch/ses-pilot) **dlasm** (acrônimo para **Dev Luch AWS SES Manager**) é uma ferramenta de linha de comando (CLI) interativa projetada para acelerar e simplificar o fluxo de trabalho de criação, gerenciamento e deploy de templates de e-mail no AWS Simple Email Service (SES).
+Uma plataforma moderna e intuitiva para gerenciar templates de e-mail do Amazon SES com sincronização local/AWS.
 
-Instale globalmente e gerencie seus templates de e-mail em qualquer projeto, diretamente do seu terminal.
+## ✨ Características
 
-## Recursos Principais
+### 🎨 Interface Moderna
+- **Design Responsivo**: Interface adaptável para desktop e mobile
+- **Tema Claro/Escuro**: Suporte completo a temas com toggle automático
+- **Componentes shadcn/ui**: Interface consistente e acessível
+- **Animações Suaves**: Transições e micro-interações fluidas
 
-- **Criação de Templates**: Crie rapidamente a estrutura de arquivos (`template.html`, `template.json`, `send-email.json`) para um novo template com conteúdo inicial.
-- **Deploy Automatizado**: Minifica seu HTML e faz o deploy do template para a AWS, criando ou atualizando conforme necessário.
-- **Rastreamento de Arquivos**: A interface desabilita ações de forma inteligente se arquivos essenciais estiverem faltando em uma pasta de template, prevenindo erros.
-- **Teste e Preview**: Envie e-mails de teste com dados dinâmicos e visualize o HTML localmente em diferentes navegadores.
-- **Gerenciamento Completo**: Delete templates da AWS diretamente pela CLI.
-- **Interface Intuitiva e Multilíngue**: Um menu interativo que suporta Inglês e Português, com detecção automática de idioma.
+### 🌍 Internacionalização
+- **Suporte a Múltiplos Idiomas**: Português e Inglês
+- **Sistema de Tradução Simples**: Baseado em chaves hierárquicas
+- **Fallback Automático**: Traduções em português como padrão
+- **Seletor de Idioma**: Toggle fácil entre idiomas
 
-## Pré-requisitos
+### 📧 Gerenciamento de Templates
+- **CRUD Completo**: Criar, Ler, Atualizar e Deletar templates
+- **Editor de Código Avançado**: Monaco Editor com syntax highlighting
+- **Preview em Tempo Real**: Visualização instantânea dos e-mails
+- **Templates de Verificação**: Suporte específico para e-mails de verificação
 
-1.  **Node.js**: Versão LTS (18.x ou superior) é recomendada.
-2.  **AWS CLI**: A ferramenta deve estar instalada e configurada com suas credenciais. Execute `aws configure` se você ainda não o fez.
+### 🔄 Sincronização AWS
+- **Status de Sincronização**: Indicadores visuais do estado dos templates
+- **Pull da AWS**: Importar templates existentes da AWS
+- **Deploy para AWS**: Enviar templates locais para a AWS
+- **Detecção de Conflitos**: Identificação automática de diferenças
 
-## Instalação
+### 🛠️ Funcionalidades Técnicas
+- **Arquivos Locais**: Trabalho primário com arquivos locais
+- **Sincronização Inteligente**: Preferência por conteúdo local
+- **Estrutura de Pastas**: Organização hierárquica de templates
+- **Configuração Flexível**: Suporte a configurações locais e globais
 
-Instale o `ses-pilot` globalmente através do NPM. Isso tornará o comando `ses-pilot` disponível em qualquer lugar no seu sistema.
+## 🚀 Instalação
 
+### Pré-requisitos
+- Node.js 18+ 
+- npm ou yarn
+- Configuração AWS SES
+
+### Setup
 ```bash
-npm install -g ses-pilot
+# Clone o repositório
+git clone https://github.com/seu-usuario/ses-pilot.git
+cd ses-pilot
+
+# Instale as dependências
+npm install
+
+# Configure as credenciais AWS
+# Crie um arquivo ses-pilot.config.json na raiz do projeto
+{
+  "templatesPath": "./ses-templates"
+}
+
+# Inicie o desenvolvimento
+npm run dev
 ```
-*(Nota: O nome `ses-pilot` pode já estar em uso no NPM. Se estiver, você precisará escolher um nome único no seu `package.json` antes de publicar.)*
 
-## Como Usar
+## 📁 Estrutura do Projeto
 
-1.  Navegue até a pasta onde você deseja gerenciar seus templates de e-mail.
-    ```bash
-    mkdir meus-emails-de-projeto
-    cd meus-emails-de-projeto
-    ```
-2.  Execute o comando:
-    ```bash
-    ses-pilot
-    ```
-    ou
-    ```bash
-    npx ses-pilot
-    ```
-3.  O menu principal será exibido.
+```
+ses-pilot/
+├── src/
+│   ├── cli/                 # CLI para gerenciamento
+│   └── web/                 # Interface web
+│       ├── app/             # Páginas Next.js
+│       ├── components/       # Componentes React
+│       │   ├── ui/          # Componentes shadcn/ui
+│       │   ├── layout/      # Componentes de layout
+│       │   └── providers/   # Providers de contexto
+│       ├── features/        # Funcionalidades específicas
+│       ├── hooks/           # Hooks customizados
+│       ├── lib/             # Utilitários e configurações
+│       └── locales/         # Arquivos de tradução
+├── ses-templates/           # Templates locais
+└── boilerplate/            # Templates de exemplo
+```
 
-### Criando seu Primeiro Template
+## 🎯 Uso
 
--   Na primeira vez que usar em uma pasta vazia, a opção principal será **"✨ CREATE NEW TEMPLATE"**.
--   Selecione-a e siga as instruções para nomear seu template.
--   A ferramenta criará uma nova pasta com os arquivos `template.html`, `template.json` e `send-email.json` prontos para você editar.
+### Interface Web
+1. **Acesse**: `http://localhost:3000`
+2. **Navegue**: Use a sidebar para acessar templates
+3. **Edite**: Clique em um template para editar
+4. **Sincronize**: Use os botões de pull/deploy para sincronizar com AWS
 
-### Gerenciando Templates Existentes
+### CLI
+```bash
+# Listar templates
+ses-pilot list
 
--   Execute `ses-pilot` na pasta que contém seus diretórios de template.
--   A lista de templates existentes aparecerá no menu principal.
--   Selecione um template para ver as ações disponíveis (Criar/Atualizar na AWS, Enviar Teste, etc.).
+# Criar novo template
+ses-pilot create
 
-## Publicando no NPM (Instruções para Você)
+# Sincronizar com AWS
+ses-pilot sync
 
-Quando estiver pronto para compartilhar sua ferramenta com o mundo:
+# Deploy para AWS
+ses-pilot deploy
+```
 
-1.  Crie uma conta em [npmjs.com](https://www.npmjs.com/).
-2.  No seu terminal, faça login na sua conta:
-    ```bash
-    npm login
-    ```
-3.  Certifique-se de que a versão no seu `package.json` é única.
-4.  Execute o comando para publicar:
-    ```bash
-    npm publish
-    ```
+## 🎨 Temas e Personalização
 
-Pronto! Sua ferramenta agora está pública e pode ser instalada por qualquer pessoa.
+### Tema Claro/Escuro
+- Toggle automático baseado nas preferências do sistema
+- Controle manual via botão na interface
+- Persistência da escolha do usuário
+
+### Cores e Estilos
+- Sistema de cores baseado em CSS variables
+- Componentes consistentes com shadcn/ui
+- Totalmente customizável via Tailwind CSS
+
+## 🌍 Internacionalização
+
+### Adicionando Novos Idiomas
+1. Adicione as traduções em `src/web/lib/i18n.ts`
+2. Atualize o tipo `Locale`
+3. Adicione a opção no seletor de idioma
+
+### Estrutura de Traduções
+```typescript
+{
+  common: {
+    welcome: 'Bem-vindo',
+    save: 'Salvar',
+    // ...
+  },
+  templates: {
+    title: 'Templates de E-mail',
+    // ...
+  }
+}
+```
+
+## 🔧 Configuração
+
+### AWS SES
+```json
+{
+  "aws": {
+    "region": "us-east-1",
+    "accessKeyId": "YOUR_ACCESS_KEY",
+    "secretAccessKey": "YOUR_SECRET_KEY"
+  }
+}
+```
+
+### Estrutura de Templates
+```
+ses-templates/
+├── welcome/
+│   ├── template.json
+│   └── template.html
+├── verification/
+│   ├── template.json
+│   └── template.html
+└── notifications/
+    ├── template.json
+    └── template.html
+```
+
+## 🚀 Deploy
+
+### Build de Produção
+```bash
+npm run build
+npm start
+```
+
+### Docker
+```dockerfile
+FROM node:18-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY . .
+RUN npm run build
+EXPOSE 3000
+CMD ["npm", "start"]
+```
+
+## 🤝 Contribuição
+
+1. Fork o projeto
+2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
+3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
+4. Push para a branch (`git push origin feature/AmazingFeature`)
+5. Abra um Pull Request
+
+## 📝 Licença
+
+Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICENSE) para detalhes.
+
+## 🙏 Agradecimentos
+
+- [shadcn/ui](https://ui.shadcn.com/) - Componentes de UI
+- [Next.js](https://nextjs.org/) - Framework React
+- [Tailwind CSS](https://tailwindcss.com/) - Framework CSS
+- [Monaco Editor](https://microsoft.github.io/monaco-editor/) - Editor de código
+- [Lucide React](https://lucide.dev/) - Ícones
+
+---
+
+Desenvolvido com ❤️ por [Seu Nome](https://github.com/seu-usuario)
