@@ -1,20 +1,21 @@
 'use client';
 
 import { SyncedTemplateNode } from '@/app/api/verification-templates/sync-status/route';
-import { useVerificationTemplates } from '@/hooks/use-verification-templates';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { SettingsDropdown } from '@/components/ui/settings-dropdown';
-import { ContextMenu } from '@/components/ui/context-menu';
-import { FolderTree } from '@/components/ui/folder-tree';
-import { useFolderManager } from '@/hooks/use-folder-manager';
 import { useLanguage } from '@/components/providers/language-provider';
 import { useTranslation } from '@/lib/i18n';
-import { Mail, Folder, Loader2, ChevronDown, RefreshCw, CloudDownload } from 'lucide-react';
+import { AWSTemplatesList } from '@/components/ui/aws-templates-list';
+import { LocalTemplatesList } from '@/components/ui/local-templates-list';
+import { useFileManager } from '@/hooks/use-file-manager';
+import { FileTreeItem } from '@/components/ui/file-tree-item';
+import { EnhancedContextMenu } from '@/components/ui/enhanced-context-menu';
+import { Mail, Folder, Loader2, ChevronDown, CloudDownload } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 function SyncStatusIndicator({ status }: { status: SyncedTemplateNode['syncStatus'] }) {
   const { locale } = useLanguage();
@@ -68,63 +69,112 @@ function TemplateNodeView({ node, basePath, level = 0, onContextMenu }: { node: 
 
 
 function VerificationTemplatesSection() {
-  const { localTree, isLoading: templatesLoading, error: templatesError, mutate } = useVerificationTemplates();
   const { 
-    folders, 
-    isLoading: foldersLoading, 
-    error: foldersError, 
-    refreshFolders,
-    createFolder,
-    moveTemplate,
-    renameFolder,
-    deleteFolder,
+    items, 
+    isLoading, 
+    error, 
+    toggleFolder, 
+    createFolder, 
     createTemplate,
-    toggleFolder
-  } = useFolderManager();
+    renameItem,
+    deleteItem
+  } = useFileManager();
+  
   const { locale } = useLanguage();
   const { t } = useTranslation(locale);
   const [isExpanded, setIsExpanded] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showAWSTemplates, setShowAWSTemplates] = useState(false);
+  const [showLocalTemplates, setShowLocalTemplates] = useState(false);
   const [contextMenu, setContextMenu] = useState<{
     isOpen: boolean;
     position: { x: number; y: number };
-    templateId?: string;
+    targetItemId?: string;
+    targetItemType?: 'folder' | 'template';
   }>({ isOpen: false, position: { x: 0, y: 0 } });
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await Promise.all([mutate(), refreshFolders()]);
-    } finally {
-      setIsRefreshing(false);
+  // Fechar menu quando clicar fora
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (contextMenu.isOpen) {
+        setContextMenu({ isOpen: false, position: { x: 0, y: 0 } });
+      }
+    };
+
+    if (contextMenu.isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
     }
-  };
-
-  // Estados combinados
-  const isLoading = templatesLoading || foldersLoading;
-  const error = templatesError || foldersError;
+  }, [contextMenu.isOpen]);
 
 
-  const handleContextAction = (action: string, data?: { name?: string; templateId?: string; folderId?: string }) => {
-    if (!data) return;
+  const handleContextAction = (action: string, data?: { name?: string; itemId?: string; itemType?: string }) => {
+    const targetItemId = contextMenu.targetItemId || 'ses-templates';
     
     switch (action) {
       case 'create-folder':
-        createFolder('root', data.name);
+        createFolder(targetItemId, data?.name || 'verification');
         break;
-      case 'move-template':
-        if (data.templateId && data.folderId) {
-          moveTemplate(data.templateId, 'root', data.folderId);
+      case 'create-template':
+        createTemplate(targetItemId, data?.name || 'Novo Template');
+        break;
+      case 'rename':
+        if (data?.name && contextMenu.targetItemId && contextMenu.targetItemType) {
+          renameItem(contextMenu.targetItemId, data.name, contextMenu.targetItemType);
+        }
+        break;
+      case 'delete':
+        if (contextMenu.targetItemId) {
+          deleteItem(contextMenu.targetItemId);
         }
         break;
     }
+    
+    // Sempre fechar o menu após qualquer ação
+    setContextMenu({ isOpen: false, position: { x: 0, y: 0 } });
   };
 
-  const handleTemplateClick = (template: { id: string; name: string; path?: string; type: string }) => {
-    if (template.path) {
-      window.location.href = `/verification-templates/${template.path}`;
+  const handleItemContextMenu = (e: React.MouseEvent, itemId: string, itemType: 'folder' | 'template') => {
+    e.preventDefault();
+    setContextMenu({
+      isOpen: true,
+      position: { x: e.clientX, y: e.clientY },
+      targetItemId: itemId,
+      targetItemType: itemType
+    });
+  };
+
+  const handleLocalContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({
+      isOpen: true,
+      position: { x: e.clientX, y: e.clientY },
+      targetItemId: 'ses-templates',
+      targetItemType: 'folder'
+    });
+  };
+
+  const handleItemClick = (item: { id: string; name: string; path: string; type: 'folder' | 'template' }) => {
+    if (item.type === 'template') {
+      if (item.path) {
+        window.location.href = `/verification-templates/${item.path}`;
+      } else {
+        // Para templates locais, usar o nome como path
+        const templateName = item.name.replace('.verification.json', '');
+        window.location.href = `/verification-templates/${templateName}`;
+      }
     }
   };
+
+  const handleAWSExplorerClick = () => {
+    setShowAWSTemplates(!showAWSTemplates);
+    setShowLocalTemplates(false);
+  };
+
+  const handleLocalExplorerClick = () => {
+    setShowLocalTemplates(!showLocalTemplates);
+    setShowAWSTemplates(false);
+  };
+
 
   return (
     <div className="space-y-3">
@@ -147,7 +197,7 @@ function VerificationTemplatesSection() {
             {t('verification.title')}
           </h3>
           <Badge variant="secondary" className="text-xs">
-            {localTree?.length || 0}
+            {items.length}
           </Badge>
         </div>
       </div>
@@ -156,73 +206,97 @@ function VerificationTemplatesSection() {
       {isExpanded && (
         <Card className="border-0 bg-muted/30">
           <CardContent className="p-3">
-            {/* Ícones centralizados estilo VSCode */}
-            <div className="flex items-center justify-center gap-4 mb-4 pb-3 border-b border-muted">
+            {/* Botões centralizados */}
+            <div className="flex items-center justify-center gap-4 mb-1 pb-3 border-b border-muted">
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={handleLocalExplorerClick}
                 className="p-2 h-auto hover:bg-muted/50"
-                title="Explorador Local"
+                title="List Local Templates"
               >
-                <Folder className="w-5 h-5" />
+                <Folder className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
                 size="sm"
+                onClick={handleAWSExplorerClick}
                 className="p-2 h-auto hover:bg-muted/50"
-                title="AWS Explorer"
+                title="List AWS Templates"
               >
-                <CloudDownload className="w-5 h-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="p-2 h-auto hover:bg-muted/50"
-                title="Verificar Mudanças"
-              >
-                <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                <CloudDownload className="w-4 h-4" />
               </Button>
             </div>
 
-            {/* Árvore de Pastas */}
-            <div className="space-y-2">
-              {isLoading && (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            {/* Conteúdo baseado no modo selecionado */}
+            {showAWSTemplates ? (
+              <div className="space-y-2">
+                {/* Header Amazon Templates */}
+                <div className="flex items-center justify-between p-1">
+                  <h4 className="text-sm font-medium">Amazon Templates</h4>
                 </div>
-              )}
-              
-              {error && (
-                <p className="text-xs text-destructive p-2 bg-destructive/10 rounded">
-                  {t('common.error')}
-                </p>
-              )}
+                
+                {/* Lista de templates da AWS */}
+                <AWSTemplatesList 
+                  isVisible={showAWSTemplates}
+                />
+              </div>
+            ) : showLocalTemplates ? (
+              <div className="space-y-2" onContextMenu={handleLocalContextMenu}>
+                {/* Header Local Templates */}
+                <div 
+                  className="flex items-center justify-between p-1 rounded"
+                >
+                  <h4 className="text-sm font-medium">Templates Locais</h4>
+                </div>
+                
+                {/* Lista de templates locais */}
+                <LocalTemplatesList 
+                  isVisible={showLocalTemplates}
+                />
+              </div>
+            ) : (
+              <>
+                {isLoading && (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  </div>
+                )}
+                
+                {error && (
+                  <p className="text-xs text-destructive p-2 bg-destructive/10 rounded">
+                    {t('common.error')}
+                  </p>
+                )}
 
-              <FolderTree
-                folders={folders}
-                onFolderToggle={toggleFolder}
-                onFolderRename={renameFolder}
-                onFolderDelete={deleteFolder}
-                onTemplateMove={moveTemplate}
-                onTemplateClick={handleTemplateClick}
-                onCreateFolder={createFolder}
-                onCreateTemplate={(parentId: string) => createTemplate(parentId, 'Novo Template')}
-              />
-            </div>
+                <div 
+                  className="space-y-1 min-h-32"
+                  onContextMenu={handleLocalContextMenu}
+                >
+                  {items.map((item) => (
+                    <FileTreeItem
+                      key={item.id}
+                      item={item}
+                      onFolderToggle={toggleFolder}
+                      onItemContextMenu={handleItemContextMenu}
+                      onItemClick={handleItemClick}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}
 
       {/* Context Menu */}
-      <ContextMenu
+      <EnhancedContextMenu
         isOpen={contextMenu.isOpen}
         position={contextMenu.position}
         onClose={() => setContextMenu({ isOpen: false, position: { x: 0, y: 0 } })}
         onAction={handleContextAction}
-        folders={folders.map(f => ({ id: f.id, name: f.name, templates: [] }))}
-        templateId={contextMenu.templateId}
+        itemType={contextMenu.targetItemType}
+        isRoot={contextMenu.targetItemId === 'ses-templates'}
       />
     </div>
   );

@@ -112,5 +112,15 @@
     "getSendQuotaDesc": "View daily email limit",
     "getSendRate": "View Send Rate",
     "getSendRateDesc": "View emails per second limit"
+  },
+  "aws": {
+    "templates": "AWS Templates",
+    "templatesDescription": "Verification templates available in AWS",
+    "noTemplates": "No templates found in AWS"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success"
   }
 }

@@ -112,5 +112,15 @@
     "getSendQuotaDesc": "Visualizar limite de e-mails por dia",
     "getSendRate": "Ver Taxa de Envio",
     "getSendRateDesc": "Visualizar limite de e-mails por segundo"
+  },
+  "aws": {
+    "templates": "Templates da AWS",
+    "templatesDescription": "Templates de verificação disponíveis na AWS",
+    "noTemplates": "Nenhum template encontrado na AWS"
+  },
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "success": "Sucesso"
   }
 }

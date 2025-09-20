@@ -17,14 +17,13 @@ export interface FolderStructure {
 export async function GET() {
   try {
     const templatesPath = await getTemplatesPath();
-    const verificationPath = path.join(templatesPath, '_verification');
     
-    if (!await fs.pathExists(verificationPath)) {
-      return NextResponse.json([]);
+    if (!await fs.pathExists(templatesPath)) {
+      return NextResponse.json({ folders: [] });
     }
 
-    const folders = await readFolderStructure(verificationPath);
-    return NextResponse.json(folders);
+    const folders = await readFolderStructure(templatesPath);
+    return NextResponse.json({ folders });
   } catch (error) {
     return NextResponse.json(
       { error: 'Erro ao ler estrutura de pastas', details: (error as Error).message },
@@ -38,21 +37,39 @@ export async function POST(request: NextRequest) {
   try {
     const { parentId, folderName } = await request.json();
     
-    // Se não fornecer nome, usar "Nova Pasta" como padrão
-    const finalFolderName = folderName || 'Nova Pasta';
+    // Validar nome da pasta
+    if (folderName && !/^[a-zA-Z0-9_-]+$/.test(folderName)) {
+      return NextResponse.json(
+        { error: 'Nome da pasta deve conter apenas letras, números, _ ou -' },
+        { status: 400 }
+      );
+    }
+    
+    // Se não fornecer nome, usar "verification" como padrão
+    const finalFolderName = folderName || 'verification';
 
     const templatesPath = await getTemplatesPath();
-    const verificationPath = path.join(templatesPath, '_verification');
     
-    const parentPath = parentId === 'root' 
-      ? verificationPath 
-      : path.join(verificationPath, parentId);
+    const parentPath = (parentId === 'root' || parentId === 'ses-templates')
+      ? templatesPath  // Criar diretamente na pasta ses-templates
+      : path.join(templatesPath, parentId);
     
     const newFolderPath = path.join(parentPath, finalFolderName);
+    
+    // Verificar se a pasta já existe
+    if (await fs.pathExists(newFolderPath)) {
+      return NextResponse.json(
+        { error: 'Pasta já existe' },
+        { status: 409 }
+      );
+    }
+    
     await fs.ensureDir(newFolderPath);
     
+    console.log(`Pasta criada com sucesso: ${newFolderPath}`);
     return NextResponse.json({ success: true, path: newFolderPath });
   } catch (error) {
+    console.error('Erro ao criar pasta:', error);
     return NextResponse.json(
       { error: 'Erro ao criar pasta', details: (error as Error).message },
       { status: 500 }
@@ -60,50 +77,61 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - Renomear pasta
+// PUT - Renomear pasta ou template
 export async function PUT(request: NextRequest) {
   try {
-    const { folderId, newName } = await request.json();
+    const { itemId, newName, itemType = 'folder' } = await request.json();
     
-    if (!folderId || !newName) {
-      return NextResponse.json({ error: 'ID da pasta e novo nome são obrigatórios' }, { status: 400 });
+    if (!itemId || !newName) {
+      return NextResponse.json({ error: 'ID do item e novo nome são obrigatórios' }, { status: 400 });
     }
 
     const templatesPath = await getTemplatesPath();
-    const verificationPath = path.join(templatesPath, '_verification');
-    const folderPath = path.join(verificationPath, folderId);
-    const newPath = path.join(path.dirname(folderPath), newName);
     
-    await fs.move(folderPath, newPath);
+    let itemPath: string;
+    let newPath: string;
+    
+    if (itemType === 'template') {
+      // Para templates, renomear o arquivo
+      itemPath = path.join(templatesPath, itemId);
+      const ext = path.extname(itemId);
+      const newFileName = newName + ext;
+      newPath = path.join(path.dirname(itemPath), newFileName);
+    } else {
+      // Para pastas, renomear o diretório
+      itemPath = path.join(templatesPath, itemId);
+      newPath = path.join(path.dirname(itemPath), newName);
+    }
+    
+    await fs.move(itemPath, newPath);
     
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
-      { error: 'Erro ao renomear pasta', details: (error as Error).message },
+      { error: 'Erro ao renomear item', details: (error as Error).message },
       { status: 500 }
     );
   }
 }
 
-// DELETE - Deletar pasta
+// DELETE - Deletar pasta ou template
 export async function DELETE(request: NextRequest) {
   try {
-    const { folderId } = await request.json();
+    const { itemId } = await request.json();
     
-    if (!folderId) {
-      return NextResponse.json({ error: 'ID da pasta é obrigatório' }, { status: 400 });
+    if (!itemId) {
+      return NextResponse.json({ error: 'ID do item é obrigatório' }, { status: 400 });
     }
 
     const templatesPath = await getTemplatesPath();
-    const verificationPath = path.join(templatesPath, '_verification');
-    const folderPath = path.join(verificationPath, folderId);
+    const itemPath = path.join(templatesPath, itemId);
     
-    await fs.remove(folderPath);
+    await fs.remove(itemPath);
     
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(
-      { error: 'Erro ao deletar pasta', details: (error as Error).message },
+      { error: 'Erro ao deletar item', details: (error as Error).message },
       { status: 500 }
     );
   }
@@ -143,23 +171,9 @@ async function readFolderStructure(basePath: string): Promise<FolderStructure[]>
     }
   }
 
-  // Se não há pastas mas há templates, criar uma pasta "Templates" padrão
-  if (folders.length === 0 && templates.length > 0) {
-    return [{
-      id: 'templates',
-      name: 'Templates',
-      type: 'folder',
-      isExpanded: true,
-      children: templates
-    }];
-  }
-
-  // Se há pastas, adicionar templates soltos como filhos da primeira pasta
-  if (folders.length > 0 && templates.length > 0) {
-    folders[0].children = [...(folders[0].children || []), ...templates];
-  }
-
-  return folders;
+  // Retornar pastas e templates separadamente
+  // Templates soltos ficam no nível raiz junto com as pastas
+  return [...folders, ...templates];
 }
 
 // Obter nome do template do arquivo JSON
