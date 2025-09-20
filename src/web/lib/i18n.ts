@@ -37,6 +37,8 @@ const translations: Record<Locale, Translations> = {
       dark: 'Escuro',
       light: 'Claro',
       system: 'Sistema',
+      portuguese: 'Português',
+      english: 'English',
     },
     dashboard: {
       title: 'Painel de Controle',
@@ -204,6 +206,8 @@ const translations: Record<Locale, Translations> = {
       dark: 'Dark',
       light: 'Light',
       system: 'System',
+      portuguese: 'Português',
+      english: 'English',
     },
     dashboard: {
       title: 'Dashboard',
@@ -345,17 +349,17 @@ const translations: Record<Locale, Translations> = {
 // Função para obter tradução
 export function t(key: string, locale: Locale = 'pt', params?: Record<string, string>): string {
   const keys = key.split('.');
-  let value: any = translations[locale];
+  let value: unknown = translations[locale];
   
   for (const k of keys) {
     if (value && typeof value === 'object' && k in value) {
-      value = value[k];
+      value = (value as Record<string, unknown>)[k];
     } else {
       // Fallback para português se a chave não existir
       value = translations.pt;
       for (const fallbackKey of keys) {
         if (value && typeof value === 'object' && fallbackKey in value) {
-          value = value[fallbackKey];
+          value = (value as Record<string, unknown>)[fallbackKey];
         } else {
           return key; // Retorna a chave se não encontrar tradução
         }

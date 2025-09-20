@@ -209,3 +209,22 @@ export async function getVerificationTemplates(rootDir: string): Promise<Templat
   
   return scan(verificationRootDir, '');
 }
+
+/**
+ * Conta recursivamente o número de templates em uma árvore de nós.
+ * @param nodes Array de nós da árvore de templates.
+ * @returns Número total de templates encontrados.
+ */
+export function countTemplates(nodes: TemplateNode[]): number {
+  let count = 0;
+  
+  for (const node of nodes) {
+    if (node.type === 'template') {
+      count++;
+    } else if (node.children) {
+      count += countTemplates(node.children);
+    }
+  }
+  
+  return count;
+}

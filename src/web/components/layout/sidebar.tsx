@@ -6,11 +6,10 @@ import { useVerificationTemplates } from '@/hooks/use-verification-templates';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ThemeToggle } from '@/components/ui/theme-toggle';
-import { LanguageToggle } from '@/components/ui/language-toggle';
+import { SettingsDropdown } from '@/components/ui/settings-dropdown';
 import { useLanguage } from '@/components/providers/language-provider';
 import { useTranslation } from '@/lib/i18n';
-import { Mail, Folder, Loader2, ChevronRight, PlusCircle, CloudDownload, Settings } from 'lucide-react';
+import { Mail, Folder, Loader2, ChevronRight, PlusCircle, CloudDownload } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -75,7 +74,7 @@ function ImportAllButton({ remoteTemplates, onImported }: { remoteTemplates: { T
       if (!res.ok) throw new Error('Falha na requisição para a API.');
       toast.success(t('templates.importSuccess'), { id: toastId });
       onImported();
-    } catch (e) {
+    } catch {
       toast.error(t('templates.importError'), { id: toastId });
     } finally {
       setIsImporting(false);
@@ -150,10 +149,6 @@ export function Sidebar() {
     <aside className="w-80 h-full border-r bg-muted/40 p-4 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">SES Pilot</h2>
-        <div className="flex items-center gap-2">
-          <LanguageToggle currentLocale={locale} onLocaleChange={setLocale} />
-          <ThemeToggle />
-        </div>
       </div>
       
       <div className="flex-1 overflow-auto flex flex-col gap-4">
@@ -170,10 +165,7 @@ export function Sidebar() {
       </div>
       
       <div className="pt-4 border-t">
-        <Button variant="outline" size="sm" className="w-full">
-          <Settings className="w-4 h-4 mr-2" />
-          {t('common.settings')}
-        </Button>
+        <SettingsDropdown currentLocale={locale} onLocaleChange={setLocale} />
       </div>
     </aside>
   );

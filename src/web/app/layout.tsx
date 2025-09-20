@@ -4,6 +4,12 @@ import { LanguageProvider } from '@/components/providers/language-provider';
 import React from 'react';
 import { Toaster } from 'sonner';
 import './globals.css'
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'SES Pilot',
+  description: 'Pilot para o SES',
+}
 
 export default function MainLayout({
   children,

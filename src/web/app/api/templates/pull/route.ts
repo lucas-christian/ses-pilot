@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     await fs.writeJson(path.join(localTemplatePath, 'template.json'), templateJson, { spaces: 2 });
     
     return NextResponse.json({ message: `Template "${templateName}" importado/atualizado com sucesso.` });
-  } catch (error: any) {
-    return NextResponse.json({ error: 'Falha ao importar template.', details: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    return NextResponse.json({ error: 'Falha ao importar template.', details: (error as { message?: string }).message }, { status: 500 });
   }
 }

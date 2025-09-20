@@ -4,12 +4,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/components/providers/language-provider';
 import { useTranslation } from '@/lib/i18n';
-import { PermissionsStatus } from '@/components/ui/permissions-status';
+import { useTemplateCounts } from '@/hooks/use-template-counts';
 import { Mail, Cloud, FileText } from 'lucide-react';
 
 export default function DashboardPage() {
   const { locale } = useLanguage();
   const { t } = useTranslation(locale);
+  const { 
+    emailTemplates: emailTemplateCount, 
+    verificationTemplates: verificationTemplateCount, 
+    isLoading 
+  } = useTemplateCounts();
 
   return (
     <div className="p-6">
@@ -33,7 +38,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold">0</span>
+              <span className="text-2xl font-bold">
+                {isLoading ? '...' : emailTemplateCount}
+              </span>
               <Badge variant="outline">{t('dashboard.local')}</Badge>
             </div>
           </CardContent>
@@ -51,7 +58,9 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold">0</span>
+              <span className="text-2xl font-bold">
+                {isLoading ? '...' : verificationTemplateCount}
+              </span>
               <Badge variant="outline">{t('dashboard.local')}</Badge>
             </div>
           </CardContent>
@@ -74,10 +83,6 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-      </div>
-
-      <div className="mt-8 space-y-6">
-        <PermissionsStatus />
       </div>
     </div>
   );

@@ -77,6 +77,70 @@ export async function deployTemplate(templateDetails: { htmlContent: string; tem
   }
 }
 
+/**
+ * Faz o deploy de um template de verificação para a AWS SES.
+ * @param templateDetails - Detalhes do template de verificação.
+ */
+export async function deployVerificationTemplate(templateDetails: { 
+  htmlContent: string; 
+  templateJson: { 
+    Template: { 
+      TemplateName: string; 
+      SubjectPart: string; 
+      HtmlPart?: string;
+      TextPart?: string;
+    }; 
+  } 
+}) {
+  const { execa } = await import('execa');
+  const fs = await import('fs-extra');
+  const path = await import('path');
+  const os = await import('os');
+
+  try {
+    // Prepara o payload para o template de verificação
+    const verificationPayload = {
+      TemplateName: templateDetails.templateJson.Template.TemplateName,
+      FromEmailAddress: process.env.AWS_SES_FROM_EMAIL || 'noreply@example.com',
+      TemplateSubject: templateDetails.templateJson.Template.SubjectPart,
+      TemplateContent: {
+        Html: templateDetails.htmlContent || templateDetails.templateJson.Template.HtmlPart || '',
+        Text: templateDetails.templateJson.Template.TextPart || ''
+      },
+      SuccessRedirectionURL: process.env.AWS_SES_SUCCESS_REDIRECT_URL || '',
+      FailureRedirectionURL: process.env.AWS_SES_FAILURE_REDIRECT_URL || ''
+    };
+
+    // Salva o payload em arquivo temporário
+    const tempJsonPath = path.join(os.tmpdir(), `ses-verification-template-${Date.now()}.json`);
+    await fs.writeJson(tempJsonPath, verificationPayload);
+
+    try {
+      // Executa o comando de criação/atualização do template de verificação
+      await execa('aws', ['sesv2', 'create-custom-verification-email-template', '--cli-input-json', `file://${tempJsonPath}`]);
+      console.log(`Template de verificação "${templateDetails.templateJson.Template.TemplateName}" criado/atualizado com sucesso.`);
+    } catch (createError) {
+      // Se falhar na criação, tenta atualizar
+      try {
+        await execa('aws', ['sesv2', 'update-custom-verification-email-template', '--cli-input-json', `file://${tempJsonPath}`]);
+        console.log(`Template de verificação "${templateDetails.templateJson.Template.TemplateName}" atualizado com sucesso.`);
+      } catch {
+        throw createError; // Re-throw o erro original se ambos falharem
+      }
+    } finally {
+      // Remove o arquivo temporário
+      try {
+        await fs.remove(tempJsonPath);
+      } catch (cleanupError) {
+        console.warn('Erro ao remover arquivo temporário:', cleanupError);
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao fazer deploy do template de verificação:', error);
+    throw new Error(`Falha no deploy do template de verificação: ${(error as { message?: string }).message || 'Erro desconhecido'}`);
+  }
+}
+
 interface RemoteTemplate {
   TemplateName: string;
   LastUpdatedTimestamp: string;
@@ -144,7 +208,7 @@ export async function getRemoteTemplateContent(templateName: string) {
         Subject: content.Subject,
         Html: content.Html,
       };
-    } catch (regularError) {
+    } catch {
       // Se falhar, tenta como template de verificação
       console.log(`Template regular não encontrado, tentando como template de verificação...`);
       console.log(`Executando comando: aws sesv2 get-custom-verification-email-template --template-name ${templateName}`);

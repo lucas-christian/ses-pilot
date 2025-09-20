@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
   // Extends the base input attributes
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(

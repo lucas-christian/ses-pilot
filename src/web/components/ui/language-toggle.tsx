@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Globe } from "lucide-react"
-import { useTranslation, Locale } from "@/lib/i18n"
+import { Locale } from "@/lib/i18n"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -17,8 +17,7 @@ interface LanguageToggleProps {
   onLocaleChange: (locale: Locale) => void;
 }
 
-export function LanguageToggle({ currentLocale, onLocaleChange }: LanguageToggleProps) {
-  const { t } = useTranslation(currentLocale);
+export function LanguageToggle({ onLocaleChange }: LanguageToggleProps) {
 
   return (
     <DropdownMenu>

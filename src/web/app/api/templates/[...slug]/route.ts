@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { deleteTemplate, getTemplateDetails, updateTemplate } from '@/lib/file-system';
 import { getTemplatesPath } from '@/lib/config';
+import { deployTemplate } from '@/lib/aws';
 
 export async function GET(
   request: Request,
@@ -36,6 +37,7 @@ export async function GET(
 export async function PUT(request: Request, { params }: { params: Promise<{ slug: string[] }> }) {
   const { slug } = await params;
   const templatesPath = await getTemplatesPath();
+  
   if (!templatesPath) {
     return NextResponse.json(
       { error: 'O caminho para os templates não está configurado.' },
@@ -45,10 +47,27 @@ export async function PUT(request: Request, { params }: { params: Promise<{ slug
 
   try {
     const body = await request.json();
-    await updateTemplate(templatesPath, slug, body);
-    return NextResponse.json({ message: 'Template salvo com sucesso.' });
+    const { htmlContent, templateJson } = body;
+
+    if (!htmlContent || !templateJson) {
+      return NextResponse.json(
+        { error: 'Conteúdo HTML e JSON do template são obrigatórios.' },
+        { status: 400 }
+      );
+    }
+
+    await updateTemplate(templatesPath, slug, { htmlContent, templateJson });
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Template atualizado com sucesso!' 
+    });
   } catch (error: unknown) {
-    return NextResponse.json({ error: 'Falha ao salvar o template.', details: (error as { message?: string }).message }, { status: 500 });
+    console.error('Erro na API de templates:', error);
+    return NextResponse.json(
+      { error: 'Erro interno do servidor.', details: (error as { message?: string }).message }, 
+      { status: 500 }
+    );
   }
 }
 
@@ -67,115 +86,164 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
     const url = new URL(request.url);
     const action = url.searchParams.get('action');
     
-    if (action === 'test-email') {
-      // Envio de e-mail de teste
-      const body = await request.json();
-      const { email } = body;
+    const actions = {
+      'test-email': async () => {
+        const body = await request.json();
+        const { email } = body;
 
-      if (!email) {
-        return NextResponse.json(
-          { error: 'E-mail de destino é obrigatório.' },
-          { status: 400 }
-        );
-      }
+        if (!email) {
+          return NextResponse.json(
+            { error: 'E-mail de destino é obrigatório.' },
+            { status: 400 }
+          );
+        }
 
-      // Validação básica de e-mail
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return NextResponse.json(
-          { error: 'E-mail inválido.' },
-          { status: 400 }
-        );
-      }
+        // Validação básica de e-mail
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          return NextResponse.json(
+            { error: 'E-mail inválido.' },
+            { status: 400 }
+          );
+        }
 
-      // Carrega os detalhes do template
-      const templateDetails = await getTemplateDetails(templatesPath, slug);
-      
-      if (!templateDetails) {
-        return NextResponse.json(
-          { error: 'Template não encontrado.' },
-          { status: 404 }
-        );
-      }
+        // Carrega os detalhes do template
+        const templateDetails = await getTemplateDetails(templatesPath, slug);
+        
+        if (!templateDetails) {
+          return NextResponse.json(
+            { error: 'Template não encontrado.' },
+            { status: 404 }
+          );
+        }
 
-      // Prepara o payload para envio de teste
-      const testEmailPayload = {
-        Destination: {
-          ToAddresses: [email]
-        },
-        Message: {
-          Body: {
-            Html: {
+        // Prepara o payload para envio de teste
+        const testEmailPayload = {
+          Destination: {
+            ToAddresses: [email]
+          },
+          Message: {
+            Body: {
+              Html: {
+                Charset: 'UTF-8',
+                Data: templateDetails.htmlContent || ''
+              }
+            },
+            Subject: {
               Charset: 'UTF-8',
-              Data: templateDetails.htmlContent || ''
+              Data: templateDetails.templateJson?.Template?.SubjectPart || 'Teste de E-mail'
             }
           },
-          Subject: {
-            Charset: 'UTF-8',
-            Data: templateDetails.templateJson?.Template?.SubjectPart || 'Teste de E-mail'
+          Source: process.env.AWS_SES_FROM_EMAIL || 'noreply@example.com'
+        };
+
+        // Salva o payload em arquivo temporário
+        const { execa } = await import('execa');
+        const fs = await import('fs-extra');
+        const path = await import('path');
+        const os = await import('os');
+        
+        const tempJsonPath = path.join(os.tmpdir(), `ses-test-email-${Date.now()}.json`);
+        await fs.writeJson(tempJsonPath, testEmailPayload);
+
+        try {
+          // Envia o e-mail de teste usando AWS CLI
+          console.log(`Enviando e-mail de teste para: ${email}`);
+          await execa('aws', ['sesv2', 'send-email', '--cli-input-json', `file://${tempJsonPath}`]);
+          
+          return NextResponse.json({ 
+            success: true, 
+            message: 'E-mail de teste enviado com sucesso!' 
+          });
+        } catch (error: unknown) {
+          console.error("Erro ao enviar e-mail de teste:", error);
+          const errorMessage = (error as { stderr?: string; message?: string }).stderr || (error as { message?: string }).message || '';
+          return NextResponse.json(
+            { error: 'Falha ao enviar e-mail de teste', details: errorMessage },
+            { status: 500 }
+          );
+        } finally {
+          // Remove o arquivo temporário
+          try {
+            await fs.remove(tempJsonPath);
+          } catch (cleanupError) {
+            console.warn('Erro ao remover arquivo temporário:', cleanupError);
           }
-        },
-        Source: process.env.AWS_SES_FROM_EMAIL || 'noreply@example.com'
-      };
+        }
+      },
+      'update': async () => {
+        const body = await request.json();
+        const { htmlContent, templateJson } = body;
 
-      // Salva o payload em arquivo temporário
-      const { execa } = await import('execa');
-      const fs = await import('fs-extra');
-      const path = await import('path');
-      const os = await import('os');
-      
-      const tempJsonPath = path.join(os.tmpdir(), `ses-test-email-${Date.now()}.json`);
-      await fs.writeJson(tempJsonPath, testEmailPayload);
+        if (!htmlContent || !templateJson) {
+          return NextResponse.json(
+            { error: 'Conteúdo HTML e JSON do template são obrigatórios.' },
+            { status: 400 }
+          );
+        }
 
-      try {
-        // Envia o e-mail de teste usando AWS CLI
-        console.log(`Enviando e-mail de teste para: ${email}`);
-        await execa('aws', ['sesv2', 'send-email', '--cli-input-json', `file://${tempJsonPath}`]);
+        await updateTemplate(templatesPath, slug, { htmlContent, templateJson });
         
         return NextResponse.json({ 
           success: true, 
-          message: 'E-mail de teste enviado com sucesso!' 
+          message: 'Template atualizado com sucesso!' 
         });
-      } catch (error: unknown) {
-        console.error("Erro ao enviar e-mail de teste:", error);
-        const errorMessage = (error as { stderr?: string; message?: string }).stderr || (error as { message?: string }).message || '';
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Falha ao enviar e-mail de teste.', 
-            details: errorMessage 
-          },
-          { status: 500 }
-        );
-      } finally {
-        // Remove o arquivo temporário
-        await fs.remove(tempJsonPath);
+      },
+      'deploy': async () => {
+        // 1. Encontra e lê os arquivos do template local
+        const templateDetails = await getTemplateDetails(templatesPath, slug);
+
+        // 2. Chama o serviço de deploy
+        await deployTemplate(templateDetails);
+
+        return NextResponse.json({ 
+          success: true, 
+          message: `Template "${slug.join('/')}" enviado para a AWS com sucesso.` 
+        });
       }
-    } else {
-      // Atualização normal do template
-      const body = await request.json();
-      await updateTemplate(templatesPath, slug, body);
-      return NextResponse.json({ message: 'Template salvo com sucesso.' });
+    };
+
+    const execAction = actions[action as keyof typeof actions];
+    if (!execAction) {
+      return NextResponse.json(
+        { error: `Ação '${action}' não encontrada. Ações disponíveis: test-email, update, deploy` },
+        { status: 400 }
+      );
     }
+
+    return await execAction();
   } catch (error: unknown) {
-    return NextResponse.json({ error: 'Falha ao processar solicitação.', details: (error as { message?: string }).message }, { status: 500 });
+    console.error('Erro na API de templates:', error);
+    return NextResponse.json(
+      { error: 'Erro interno do servidor.', details: (error as { message?: string }).message },
+      { status: 500 }
+    );
   }
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ slug: string[] }> }) {
-    const { slug } = await params;
-    const templatesPath = await getTemplatesPath();
-    if (!templatesPath) {
-      return NextResponse.json(
-        { error: 'O caminho para os templates não está configurado.' },
-        { status: 500 }
-      );
-    }
+  const { slug } = await params;
+  const templatesPath = await getTemplatesPath();
+  
+  if (!templatesPath) {
+    return NextResponse.json(
+      { error: 'O caminho para os templates não está configurado.' },
+      { status: 500 }
+    );
+  }
 
-    try {
-        await deleteTemplate(templatesPath, slug);
-        return NextResponse.json({ message: 'Template deletado com sucesso.' }, { status: 200 });
-    } catch (error: unknown) {
-        return NextResponse.json({ error: 'Falha ao deletar o template.', details: (error as { message?: string }).message }, { status: 500 });
-    }
+  try {
+    await deleteTemplate(templatesPath, slug);
+    
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Template excluído com sucesso!' 
+    });
+  } catch (error: unknown) {
+    console.error('Erro na API de templates:', error);
+    return NextResponse.json(
+      { error: 'Erro interno do servidor.', details: (error as { message?: string }).message },
+      { status: 500 }
+    );
+  }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +36,25 @@ export default function VerificationTemplatePage() {
 
   const templatePath = params.slug ? (Array.isArray(params.slug) ? params.slug.join('/') : params.slug) : null;
 
+  const loadTemplate = useCallback(async () => {
+    if (!templatePath) return;
+    
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/verification-templates/${templatePath}`);
+      if (response.ok) {
+        const data = await response.json();
+        setTemplate(data);
+      } else {
+        toast.error(t('common.error'));
+      }
+    } catch {
+      toast.error(t('common.error'));
+    } finally {
+      setIsLoading(false);
+    }
+  }, [templatePath]);
+
   useEffect(() => {
     if (templatePath) {
       loadTemplate();
@@ -52,26 +71,7 @@ export default function VerificationTemplatePage() {
         }
       });
     }
-  }, [templatePath]);
-
-  const loadTemplate = async () => {
-    if (!templatePath) return;
-    
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/api/verification-templates/${templatePath}`);
-      if (response.ok) {
-        const data = await response.json();
-        setTemplate(data);
-      } else {
-        toast.error(t('common.error'));
-      }
-    } catch (error) {
-      toast.error(t('common.error'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [templatePath, loadTemplate]);
 
   const saveTemplate = async () => {
     if (!template) return;
@@ -95,7 +95,7 @@ export default function VerificationTemplatePage() {
       } else {
         toast.error(t('editor.saveError'));
       }
-    } catch (error) {
+    } catch {
       toast.error(t('editor.saveError'));
     } finally {
       setIsLoading(false);
@@ -118,7 +118,7 @@ export default function VerificationTemplatePage() {
       } else {
         toast.error(t('editor.deployError'));
       }
-    } catch (error) {
+    } catch {
       toast.error(t('editor.deployError'));
     } finally {
       setIsLoading(false);
@@ -141,7 +141,7 @@ export default function VerificationTemplatePage() {
       } else {
         toast.error(t('common.error'));
       }
-    } catch (error) {
+    } catch {
       toast.error(t('common.error'));
     } finally {
       setIsLoading(false);
@@ -164,7 +164,7 @@ export default function VerificationTemplatePage() {
       } else {
         toast.error(t('common.error'));
       }
-    } catch (error) {
+    } catch {
       toast.error(t('common.error'));
     } finally {
       setIsLoading(false);
@@ -204,7 +204,7 @@ export default function VerificationTemplatePage() {
   return (
     <div className="p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-4 justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold mb-2">
             {isNewTemplate ? t('verification.newTemplate') : template.templateJson.Template.TemplateName}
