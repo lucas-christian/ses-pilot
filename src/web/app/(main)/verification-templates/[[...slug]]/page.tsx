@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,7 +11,7 @@ import { useLanguage } from '@/components/providers/language-provider';
 import { useTranslation } from '@/lib/i18n';
 import { CodeEditor } from '@/features/template-editor/code-editor';
 import { PreviewPanel } from '@/features/template-editor/preview-panel';
-import { FileText, Save, CloudUpload, Download, Eye, Trash2, Plus, Send } from 'lucide-react';
+import { FileText, Save, CloudUpload, Download, Trash2, Plus, Send, Maximize2, Code, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { TestEmailModal } from '@/components/ui/test-email-modal';
 
@@ -21,7 +21,10 @@ interface VerificationTemplate {
     Template: {
       TemplateName: string;
       SubjectPart: string;
-    }
+    };
+    FromEmailAddress: string;
+    SuccessRedirectionURL: string;
+    FailureRedirectionURL: string;
   }
 }
 
@@ -33,45 +36,49 @@ export default function VerificationTemplatePage() {
   const [showPreview, setShowPreview] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isNewTemplate, setIsNewTemplate] = useState(false);
+  const [showMaximizedPreview, setShowMaximizedPreview] = useState(false);
+  const [showHtmlEditor, setShowHtmlEditor] = useState(false);
 
   const templatePath = params.slug ? (Array.isArray(params.slug) ? params.slug.join('/') : params.slug) : null;
 
-  const loadTemplate = useCallback(async () => {
-    if (!templatePath) return;
-    
-    setIsLoading(true);
-    try {
-      const response = await fetch(`/api/verification-templates/${templatePath}`);
-      if (response.ok) {
-        const data = await response.json();
-        setTemplate(data);
-      } else {
-        toast.error(t('common.error'));
-      }
-    } catch {
-      toast.error(t('common.error'));
-    } finally {
-      setIsLoading(false);
-    }
-  }, [templatePath]);
-
   useEffect(() => {
-    if (templatePath) {
-      loadTemplate();
-    } else {
-      // Novo template
-      setIsNewTemplate(true);
-      setTemplate({
-        htmlContent: '',
-        templateJson: {
-          Template: {
-            TemplateName: '',
-            SubjectPart: '',
+    const loadTemplate = async () => {
+      if (!templatePath) {
+        // Novo template
+        setIsNewTemplate(true);
+        setTemplate({
+          htmlContent: '',
+          templateJson: {
+            Template: {
+              TemplateName: '',
+              SubjectPart: '',
+            },
+            FromEmailAddress: '',
+            SuccessRedirectionURL: '',
+            FailureRedirectionURL: ''
           }
+        });
+        return;
+      }
+      
+      setIsLoading(true);
+      try {
+        const response = await fetch(`/api/verification-templates/${templatePath}`);
+        if (response.ok) {
+          const data = await response.json();
+          setTemplate(data);
+        } else {
+          toast.error('Erro ao carregar template');
         }
-      });
-    }
-  }, [templatePath, loadTemplate]);
+      } catch {
+        toast.error('Erro ao carregar template');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadTemplate();
+  }, [templatePath]);
 
   const saveTemplate = async () => {
     if (!template) return;
@@ -107,10 +114,10 @@ export default function VerificationTemplatePage() {
     
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/verification-templates/${templatePath}?action=deploy`, {
+      const response = await fetch('/api/verification-templates/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(template),
+        body: JSON.stringify({ slug: templatePath?.split('/') || [] }),
       });
       
       if (response.ok) {
@@ -218,14 +225,6 @@ export default function VerificationTemplatePage() {
         </div>
         
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setShowPreview(!showPreview)}
-          >
-            <Eye className="w-4 h-4 mr-2" />
-            {t('editor.preview')}
-          </Button>
-          
           {!isNewTemplate && templatePath && (
             <TestEmailModal templatePath={templatePath} isVerification={true}>
               <Button variant="outline" disabled={isLoading}>
@@ -289,25 +288,25 @@ export default function VerificationTemplatePage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Editor Panel */}
-        <div className="space-y-6">
-          {/* Template Name */}
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('verification.templateName')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Input
-                value={template.templateJson.Template.TemplateName}
-                onChange={(e) => setTemplate({ ...template, templateJson: { ...template.templateJson, Template: { ...template.templateJson.Template, TemplateName: e.target.value } } })}
-                placeholder="Nome do template de verificação"
-                disabled
-              />
-            </CardContent>
-          </Card>
+      {/* Template Configuration */}
+      <div className="space-y-6 mb-6">
+        {/* Template Name */}
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('verification.templateName')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Input
+              value={template.templateJson.Template.TemplateName}
+              onChange={(e) => setTemplate({ ...template, templateJson: { ...template.templateJson, Template: { ...template.templateJson.Template, TemplateName: e.target.value } } })}
+              placeholder="Nome do template de verificação"
+              disabled
+            />
+          </CardContent>
+        </Card>
 
-          {/* Subject */}
+        {/* Subject and Email Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Card>
             <CardHeader>
               <CardTitle>{t('verification.subject')}</CardTitle>
@@ -321,39 +320,200 @@ export default function VerificationTemplatePage() {
             </CardContent>
           </Card>
 
-          {/* HTML Content */}
-          <Card className="flex-1">
+          <Card>
             <CardHeader>
-              <CardTitle>{t('verification.htmlContent')}</CardTitle>
+              <CardTitle>E-mail de Origem</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-96 border rounded-md">
+              <Input
+                value={template.templateJson.FromEmailAddress}
+                onChange={(e) => setTemplate({ ...template, templateJson: { ...template.templateJson, FromEmailAddress: e.target.value } })}
+                placeholder="Confirme seu e-mail <confirmation@dev-luch.com>"
+              />
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* URLs Row */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>URL de Sucesso</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Input
+                value={template.templateJson.SuccessRedirectionURL}
+                onChange={(e) => setTemplate({ ...template, templateJson: { ...template.templateJson, SuccessRedirectionURL: e.target.value } })}
+                placeholder="https://dev-luch.com/email_confirmed"
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>URL de Falha</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Input
+                value={template.templateJson.FailureRedirectionURL}
+                onChange={(e) => setTemplate({ ...template, templateJson: { ...template.templateJson, FailureRedirectionURL: e.target.value } })}
+                placeholder="https://dev-luch.com/email_failed"
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* HTML Content Button */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>{t('verification.htmlContent')}</CardTitle>
+          <CardDescription>
+            Edite o conteúdo HTML do template de verificação
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Code className="w-5 h-5 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">
+                {template.htmlContent.length > 0 
+                  ? `${template.htmlContent.length} caracteres` 
+                  : 'Nenhum conteúdo HTML'
+                }
+              </span>
+            </div>
+            <Button onClick={() => setShowHtmlEditor(true)}>
+              <Code className="w-4 h-4 mr-2" />
+              Editar HTML
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Preview Panel */}
+      {showPreview && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>{t('editor.preview')}</CardTitle>
+              <CardDescription>
+                Visualização do e-mail de verificação
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPreview(!showPreview)}
+              >
+                Ocultar Preview
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMaximizedPreview(true)}
+              >
+                <Maximize2 className="w-4 h-4 mr-2" />
+                Maximizar
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="h-96">
+              <PreviewPanel htmlContent={template.htmlContent} />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Show Preview Button when hidden */}
+      {!showPreview && (
+        <Card>
+          <CardContent className="p-6 text-center">
+            <Button
+              variant="outline"
+              onClick={() => setShowPreview(true)}
+              className="w-full"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Mostrar Preview
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* HTML Editor Modal */}
+      <Dialog open={showHtmlEditor} onOpenChange={setShowHtmlEditor}>
+        <DialogContent className="max-w-7xl w-[95vw] h-[95vh] p-0 flex flex-col">
+          <DialogHeader className="p-6 pb-2 flex-shrink-0">
+            <DialogTitle>Editor HTML - {t('verification.htmlContent')}</DialogTitle>
+            <DialogDescription>
+              Edite o conteúdo HTML e visualize o resultado em tempo real
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 p-6 pt-2 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* HTML Editor */}
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium">Editor HTML</h3>
+                <div className="text-xs text-muted-foreground">
+                  {template.htmlContent.length} caracteres
+                </div>
+              </div>
+              <div className="flex-1 border rounded-md overflow-hidden">
                 <CodeEditor
                   value={template.htmlContent}
                   onChange={(value) => setTemplate({ ...template, htmlContent: value || '' })}
                 />
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
 
-        {/* Preview Panel */}
-        {showPreview && (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('editor.preview')}</CardTitle>
-              <CardDescription>
-                Visualização do e-mail de verificação
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-96">
+            {/* Preview */}
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium">Preview</h3>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowMaximizedPreview(true)}
+                >
+                  <Maximize2 className="w-4 h-4 mr-2" />
+                  Maximizar
+                </Button>
+              </div>
+              <div className="flex-1 border rounded-md overflow-hidden">
                 <PreviewPanel htmlContent={template.htmlContent} />
               </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            </div>
+          </div>
+          <DialogFooter className="p-6 pt-0 flex-shrink-0">
+            <Button variant="outline" onClick={() => setShowHtmlEditor(false)}>
+              Fechar
+            </Button>
+            <Button onClick={() => setShowHtmlEditor(false)}>
+              Salvar e Fechar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Maximized Preview Modal */}
+      <Dialog open={showMaximizedPreview} onOpenChange={setShowMaximizedPreview}>
+        <DialogContent className="max-w-7xl w-[95vw] h-[95vh] p-0 flex flex-col">
+          <DialogHeader className="p-6 pb-2 flex-shrink-0">
+            <DialogTitle>{t('editor.preview')} - Visualização Completa</DialogTitle>
+            <DialogDescription>
+              Visualização em tela cheia do e-mail de verificação
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 p-6 pt-2 min-h-0">
+            <div className="h-full">
+              <PreviewPanel htmlContent={template.htmlContent} />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

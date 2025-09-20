@@ -2,7 +2,14 @@ import { NextResponse } from 'next/server';
 import { getTemplatesPath } from '@/lib/config';
 import { getVerificationTemplates } from '@/lib/file-system';
 import { listRemoteVerificationTemplates } from '@/lib/aws';
-import { SyncedTemplateNode } from '../sync-status/route'; // Reutilizamos os tipos
+
+export interface SyncedTemplateNode {
+  name: string;
+  type: 'folder' | 'template';
+  relativePath: string;
+  syncStatus?: 'synced' | 'modified' | 'new_local' | 'unknown';
+  children?: SyncedTemplateNode[];
+}
 
 export async function GET() {
   try {

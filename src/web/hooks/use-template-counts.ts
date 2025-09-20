@@ -11,7 +11,7 @@ interface TemplateCountsResponse {
 }
 
 export function useTemplateCounts() {
-  const { data, error, isLoading, mutate } = useSWR<TemplateCountsResponse>('/api/template-counts', fetcher);
+  const { data, error, isLoading, mutate } = useSWR<TemplateCountsResponse>('/api/verification-templates/count', fetcher);
 
   return {
     emailTemplates: data?.emailTemplates ?? 0,

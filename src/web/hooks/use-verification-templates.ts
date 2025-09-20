@@ -1,7 +1,7 @@
 'use client';
 
 import useSWR from 'swr';
-import type { SyncedTemplateNode } from '@/app/api/sync-status/route';
+import type { SyncedTemplateNode } from '@/app/api/verification-templates/sync-status/route';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -13,11 +13,11 @@ interface SyncStatusResponse {
 }
 
 export function useVerificationTemplates() {
-  const { data, error, isLoading, mutate } = useSWR<SyncStatusResponse>('/api/sync-status', fetcher);
+  const { data, error, isLoading, mutate } = useSWR<SyncStatusResponse>('/api/verification-templates/sync-status', fetcher);
 
   return {
     // Retornamos os dados de forma separada para facilitar o uso
-    localTree: data?.verificationTree,
+    localTree: data?.localTree,
     remoteOnly: data?.remoteOnly,
     error,
     isLoading,

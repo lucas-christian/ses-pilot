@@ -5,13 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/components/providers/language-provider';
 import { useTranslation } from '@/lib/i18n';
 import { useTemplateCounts } from '@/hooks/use-template-counts';
-import { Mail, Cloud, FileText } from 'lucide-react';
+import { Cloud, FileText } from 'lucide-react';
 
 export default function DashboardPage() {
   const { locale } = useLanguage();
   const { t } = useTranslation(locale);
   const { 
-    emailTemplates: emailTemplateCount, 
     verificationTemplates: verificationTemplateCount, 
     isLoading 
   } = useTemplateCounts();
@@ -25,27 +24,7 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Mail className="w-5 h-5" />
-              {t('dashboard.emailTemplates')}
-            </CardTitle>
-            <CardDescription>
-              {t('dashboard.emailTemplatesDesc')}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <span className="text-2xl font-bold">
-                {isLoading ? '...' : emailTemplateCount}
-              </span>
-              <Badge variant="outline">{t('dashboard.local')}</Badge>
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

@@ -37,9 +37,7 @@ export function TestEmailModal({ templatePath, isVerification = false, children 
 
     setIsLoading(true);
     try {
-      const apiPath = isVerification 
-        ? `/api/verification-templates/${templatePath}?action=test-email`
-        : `/api/templates/${templatePath}?action=test-email`;
+      const apiPath = `/api/verification-templates/${templatePath}?action=test-email`;
 
       const response = await fetch(apiPath, {
         method: 'POST',
