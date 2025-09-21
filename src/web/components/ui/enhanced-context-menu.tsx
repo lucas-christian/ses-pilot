@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { 
-  FolderPlus, 
+import {
+  FolderPlus,
   Plus,
   Trash2,
   Edit2
@@ -17,60 +16,49 @@ interface EnhancedContextMenuProps {
   onAction: (action: string, data?: { name?: string; itemId?: string; itemType?: string }) => void;
   itemType?: 'folder' | 'template';
   isRoot?: boolean;
+  onInlineEdit?: (action: string, position: { x: number; y: number }) => void;
+  isRootFolder?: boolean;
 }
 
-export function EnhancedContextMenu({ 
-  isOpen, 
-  position, 
-  onClose, 
-  onAction, 
+export function EnhancedContextMenu({
+  isOpen,
+  position,
+  onClose,
+  onAction,
   itemType,
-  isRoot = false 
+  isRoot = false,
+  onInlineEdit,
+  isRootFolder = false
 }: EnhancedContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const [inputValue, setInputValue] = useState('');
-  const [showInput, setShowInput] = useState(false);
-  const [inputAction, setInputAction] = useState<string>('');
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose();
+        const target = event.target as Element;
+        const isContextMenuTrigger = target.closest('[data-context-menu-trigger]');
+        if (!isContextMenuTrigger) onClose();
       }
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      // Usar capture: true para interceptar o evento antes
+      document.addEventListener('click', handleClickOutside, true);
+      return () => document.removeEventListener('click', handleClickOutside, true);
     }
   }, [isOpen, onClose]);
 
   const handleAction = (action: string, requiresInput = false) => {
-    if (requiresInput) {
-      setInputAction(action);
-      setShowInput(true);
-      setInputValue('');
+    if (requiresInput && onInlineEdit) {
+      // Fechar o menu e ativar o inline-editor
+      onClose();
+      onInlineEdit(action, position);
     } else {
       onAction(action);
       onClose();
     }
   };
 
-  const handleInputSubmit = () => {
-    if (inputValue.trim()) {
-      onAction(inputAction, { name: inputValue.trim() });
-      onClose();
-    }
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleInputSubmit();
-    } else if (e.key === 'Escape') {
-      setShowInput(false);
-      setInputValue('');
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -83,92 +71,62 @@ export function EnhancedContextMenu({
         top: position.y,
       }}
     >
-      {showInput ? (
-        <div className="p-2">
-          <Input
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={inputAction === 'create-folder' ? 'Nome da pasta (padrão: verification)' : 'Nome do template'}
-            className="text-xs h-8"
-            autoFocus
-          />
-          <div className="flex gap-1 mt-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleInputSubmit}
-              className="text-xs h-6 px-2"
-            >
-              Criar
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowInput(false)}
-              className="text-xs h-6 px-2"
-            >
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      ) : (
+      {
         <>
-          <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground border-b">
-            {isRoot ? 'Criar Novo' : itemType === 'folder' ? 'Pasta' : 'Template'}
-          </div>
-          
           <div className="py-1">
-            {/* Opções de criação */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-xs h-8 px-2"
-              onClick={() => handleAction('create-folder', true)}
-            >
-              <FolderPlus className="w-3 h-3 mr-2" />
-              Nova Pasta
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start text-xs h-8 px-2"
-              onClick={() => handleAction('create-template', true)}
-            >
-              <Plus className="w-3 h-3 mr-2" />
-              Novo Template
-            </Button>
-
-            {/* Opções para itens existentes */}
-            {!isRoot && (
+            {/* Opções de criação - apenas para pastas */}
+            {itemType === 'folder' && (
               <>
-                <div className="border-t border-muted my-1" />
-                
                 <Button
                   variant="ghost"
                   size="sm"
                   className="w-full justify-start text-xs h-8 px-2"
-                  onClick={() => handleAction('rename', true)}
+                  onClick={() => handleAction('create-folder', true)}
                 >
-                  <Edit2 className="w-3 h-3 mr-2" />
-                  Renomear
+                  <FolderPlus className="w-4 h-4 mr-2" />
+                  Nova Pasta
                 </Button>
-                
+
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="w-full justify-start text-xs h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => handleAction('delete')}
+                  className="w-full justify-start text-xs h-8 px-2"
+                  onClick={() => handleAction('create-template', true)}
                 >
-                  <Trash2 className="w-3 h-3 mr-2" />
-                  Deletar
+                  <Plus className="w-4 h-4 mr-2" />
+                  Novo Template
                 </Button>
+
+                <div className="border-t border-muted my-1" />
               </>
+            )}
+
+            {/* Renomear sempre disponível */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-xs h-8 px-2"
+              onClick={() => handleAction('rename', true)}
+            >
+              <Edit2 className="w-4 h-4 mr-2" />
+              Renomear
+            </Button>
+
+            {/* Deletar apenas se não for a pasta raiz */}
+            {!isRootFolder && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start text-xs h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                onClick={() => handleAction('delete')}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Deletar
+              </Button>
             )}
           </div>
         </>
-      )}
-    </div>
+
+      }</div>
   );
 }

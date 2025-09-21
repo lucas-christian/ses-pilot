@@ -15,7 +15,8 @@ import { EnhancedContextMenu } from '@/components/ui/enhanced-context-menu';
 import { Mail, Folder, Loader2, ChevronDown, CloudDownload } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useConfig } from '@/hooks/use-config';
 
 function SyncStatusIndicator({ status }: { status: SyncedTemplateNode['syncStatus'] }) {
   const { locale } = useLanguage();
@@ -80,6 +81,8 @@ function VerificationTemplatesSection() {
     deleteItem
   } = useFileManager();
   
+  const { config, updateConfig } = useConfig();
+  
   const { locale } = useLanguage();
   const { t } = useTranslation(locale);
   const [isExpanded, setIsExpanded] = useState(true);
@@ -91,24 +94,19 @@ function VerificationTemplatesSection() {
     targetItemId?: string;
     targetItemType?: 'folder' | 'template';
   }>({ isOpen: false, position: { x: 0, y: 0 } });
-
-  // Fechar menu quando clicar fora
-  useEffect(() => {
-    const handleClickOutside = () => {
-      if (contextMenu.isOpen) {
-        setContextMenu({ isOpen: false, position: { x: 0, y: 0 } });
-      }
-    };
-
-    if (contextMenu.isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
-    }
-  }, [contextMenu.isOpen]);
-
+  
+  const [inlineAction, setInlineAction] = useState<{
+    mode: 'create';
+    parentId: string;
+    type: 'folder' | 'template';
+  } | {
+    mode: 'rename';
+    itemId: string;
+    oldName: string;
+  } | null>(null);
 
   const handleContextAction = (action: string, data?: { name?: string; itemId?: string; itemType?: string }) => {
-    const targetItemId = contextMenu.targetItemId || 'ses-templates';
+    const targetItemId = contextMenu.targetItemId || getRootFolderId();
     
     switch (action) {
       case 'create-folder':
@@ -119,7 +117,12 @@ function VerificationTemplatesSection() {
         break;
       case 'rename':
         if (data?.name && contextMenu.targetItemId && contextMenu.targetItemType) {
-          renameItem(contextMenu.targetItemId, data.name, contextMenu.targetItemType);
+          // Usar a função de renomeação apropriada baseada no item
+          if (contextMenu.targetItemId === getRootFolderId()) {
+            handleRootRename(data.name);
+          } else {
+            renameItem(contextMenu.targetItemId, data.name, contextMenu.targetItemType);
+          }
         }
         break;
       case 'delete':
@@ -175,6 +178,30 @@ function VerificationTemplatesSection() {
     setShowAWSTemplates(false);
   };
 
+  const handleRootRename = async (newName: string) => {
+    try {
+      // Atualizar o arquivo de configuração
+      await updateConfig({
+        templatesPath: `./${newName}`
+      });
+      
+      // Atualizar o nome da pasta no sistema de arquivos
+      // Aqui você pode adicionar lógica para renomear a pasta física se necessário
+      
+      // Recarregar a página para refletir as mudanças
+      window.location.reload();
+    } catch (error) {
+      console.error('Erro ao renomear pasta raiz:', error);
+    }
+  };
+
+  // Obter o ID da pasta raiz baseado na configuração
+  const getRootFolderId = () => {
+    if (!config) return 'ses-templates';
+    const pathParts = config.templatesPath.split('/');
+    return pathParts[pathParts.length - 1] || 'ses-templates';
+  };
+
 
   return (
     <div className="space-y-3">
@@ -202,9 +229,10 @@ function VerificationTemplatesSection() {
         </div>
       </div>
 
+
       {/* Conteúdo do accordion */}
       {isExpanded && (
-        <Card className="border-0 bg-muted/30">
+        <Card className="border-0 bg-muted/30" onContextMenu={handleLocalContextMenu}>
           <CardContent className="p-3">
             {/* Botões centralizados */}
             <div className="flex items-center justify-center gap-4 mb-1 pb-3 border-b border-muted">
@@ -242,7 +270,7 @@ function VerificationTemplatesSection() {
                 />
               </div>
             ) : showLocalTemplates ? (
-              <div className="space-y-2" onContextMenu={handleLocalContextMenu}>
+              <div className="space-y-2">
                 {/* Header Local Templates */}
                 <div 
                   className="flex items-center justify-between p-1 rounded"
@@ -280,6 +308,13 @@ function VerificationTemplatesSection() {
                       onFolderToggle={toggleFolder}
                       onItemContextMenu={handleItemContextMenu}
                       onItemClick={handleItemClick}
+                      createFolder={createFolder}
+                      createTemplate={createTemplate}
+                      renameItem={item.id === getRootFolderId() ? handleRootRename : renameItem}
+                      deleteItem={deleteItem}
+                      inlineAction={inlineAction}
+                      setInlineAction={setInlineAction}
+                      rootFolderId={getRootFolderId()}
                     />
                   ))}
                 </div>
@@ -296,7 +331,8 @@ function VerificationTemplatesSection() {
         onClose={() => setContextMenu({ isOpen: false, position: { x: 0, y: 0 } })}
         onAction={handleContextAction}
         itemType={contextMenu.targetItemType}
-        isRoot={contextMenu.targetItemId === 'ses-templates'}
+        isRoot={contextMenu.targetItemId === getRootFolderId()}
+        isRootFolder={contextMenu.targetItemId === getRootFolderId()}
       />
     </div>
   );
