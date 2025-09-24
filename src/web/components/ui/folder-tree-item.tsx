@@ -81,7 +81,7 @@ export function FolderTreeItem({
     <div>
       <div
         className={`flex items-center gap-1 py-1 px-2 rounded hover:bg-accent/50 transition-colors cursor-pointer group`}
-        style={{ paddingLeft: `${level * 12 + 8}px` }}
+        style={{ paddingLeft: `${level * 24 + 8}px` }}
         onClick={handleClick}
         onContextMenu={handleContextMenu}
         onMouseEnter={() => setShowActions(true)}

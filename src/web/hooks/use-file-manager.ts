@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import useSWR from 'swr';
 
 export interface FileSystemItem {
   id: string;
@@ -12,6 +13,17 @@ export interface FileSystemItem {
   parentId?: string;
   lastModified?: string;
   size?: number;
+  syncStatus?: 'synced' | 'modified' | 'new_local' | 'unknown';
+}
+
+interface ApiFolderItem {
+  id: string;
+  name: string;
+  type: 'folder' | 'template';
+  path?: string;
+  isExpanded?: boolean;
+  children?: ApiFolderItem[];
+  syncStatus?: 'synced' | 'modified' | 'new_local' | 'unknown';
 }
 
 export interface FileSystemState {
@@ -26,6 +38,12 @@ export function useFileManager() {
     isLoading: true,
     error: null
   });
+
+  // Buscar dados de sincronização
+  const { data: syncData, error: syncError } = useSWR('/api/verification-templates/sync-status');
+  
+  console.log('SyncData recebido:', syncData);
+  console.log('SyncError:', syncError);
 
   // Carregar estrutura de arquivos
   const loadFileSystem = useCallback(async () => {
@@ -49,22 +67,59 @@ export function useFileManager() {
         children: []
       };
 
+      // Função recursiva para converter dados da API
+      const convertToFileSystemItem = (item: ApiFolderItem, parentId: string = 'ses-templates'): FileSystemItem => {
+        console.log('Convertendo item:', item.name, 'tipo:', item.type);
+        
+        // Buscar status de sincronização nos dados de sync
+        let syncStatus: 'synced' | 'modified' | 'new_local' | 'unknown' = 'unknown';
+        
+        if (syncData && item.type === 'template') {
+          console.log('Comparando template local:', item.name, 'com dados remotos');
+          
+          // Verificar se existe nos templates remotos
+          const existsInRemote = syncData.remoteOnly?.some((remote: { TemplateName: string }) => 
+            remote.TemplateName === item.name.replace('.verification.json', '')
+          );
+          
+          // Verificar se existe na árvore local (já processada)
+          const existsInLocal = syncData.localTree?.some((local: { name: string }) => 
+            local.name === item.name.replace('.verification.json', '')
+          );
+          
+          console.log('Existe no remoto:', existsInRemote, 'Existe no local:', existsInLocal);
+          
+          if (existsInRemote && existsInLocal) {
+            syncStatus = 'synced';
+          } else if (existsInLocal && !existsInRemote) {
+            syncStatus = 'new_local';
+          } else if (!existsInLocal && existsInRemote) {
+            syncStatus = 'unknown'; // Template só existe no remoto
+          } else {
+            syncStatus = 'unknown';
+          }
+          
+          console.log('Status determinado:', syncStatus);
+        } else if (item.type === 'template') {
+          // Fallback: se não há dados de sync, assumir 'new_local' para templates existentes
+          console.log('Sem dados de sync, assumindo new_local para:', item.name);
+          syncStatus = 'new_local';
+        }
+
+        return {
+          id: item.id,
+          name: item.name,
+          type: item.type,
+          path: item.path || item.name,
+          isExpanded: item.isExpanded || false,
+          children: item.children ? item.children.map((child: ApiFolderItem) => convertToFileSystemItem(child, item.id)) : [],
+          parentId,
+          syncStatus
+        };
+      };
+
       // Converter dados da API para FileSystemItem
-      const items: FileSystemItem[] = data.folders.map((item: { id: string; name: string; type: 'folder' | 'template'; path?: string; isExpanded?: boolean; children?: { id: string; name: string; type: 'folder' | 'template'; path?: string }[] }) => ({
-        id: item.id,
-        name: item.name,
-        type: item.type,
-        path: item.path || item.name,
-        isExpanded: item.isExpanded || false,
-        children: item.children ? item.children.map((child: { id: string; name: string; type: 'folder' | 'template'; path?: string }) => ({
-          id: child.id,
-          name: child.name,
-          type: child.type,
-          path: child.path || child.name,
-          parentId: item.id
-        })) : [],
-        parentId: 'ses-templates'
-      }));
+      const items: FileSystemItem[] = data.folders.map((item: ApiFolderItem) => convertToFileSystemItem(item));
 
       rootItem.children = items;
       
@@ -81,7 +136,7 @@ export function useFileManager() {
         error: err instanceof Error ? err.message : 'Erro ao carregar arquivos'
       });
     }
-  }, []);
+  }, [syncData]);
 
   // Inicializar
   useEffect(() => {
@@ -185,6 +240,7 @@ export function useFileManager() {
   // Deletar item
   const deleteItem = useCallback(async (itemId: string) => {
     try {
+      console.log('Deletando item com ID:', itemId);
       const response = await fetch('/api/folders', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
@@ -193,14 +249,44 @@ export function useFileManager() {
 
       if (!response.ok) {
         const error = await response.json();
+        console.error('Erro na API:', error);
         throw new Error(error.error || 'Erro ao deletar item');
       }
 
+      console.log('Item deletado com sucesso');
       await loadFileSystem();
     } catch (err) {
+      console.error('Erro ao deletar:', err);
       setState(prev => ({
         ...prev,
         error: err instanceof Error ? err.message : 'Erro ao deletar item'
+      }));
+    }
+  }, [loadFileSystem]);
+
+  // Mover item
+  const moveItem = useCallback(async (itemId: string, newParentId: string) => {
+    try {
+      console.log('Movendo item:', itemId, 'para pasta:', newParentId);
+      const response = await fetch('/api/folders/move-template', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId, newParentId })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Erro na API:', error);
+        throw new Error(error.error || 'Erro ao mover item');
+      }
+
+      console.log('Item movido com sucesso');
+      await loadFileSystem();
+    } catch (err) {
+      console.error('Erro ao mover:', err);
+      setState(prev => ({
+        ...prev,
+        error: err instanceof Error ? err.message : 'Erro ao mover item'
       }));
     }
   }, [loadFileSystem]);
@@ -212,6 +298,7 @@ export function useFileManager() {
     createTemplate,
     renameItem,
     deleteItem,
+    moveItem,
     refresh: loadFileSystem
   };
 }

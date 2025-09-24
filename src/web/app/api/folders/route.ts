@@ -22,7 +22,7 @@ export async function GET() {
       return NextResponse.json({ folders: [] });
     }
 
-    const folders = await readFolderStructure(templatesPath);
+    const folders = await readFolderStructure(templatesPath, '');
     return NextResponse.json({ folders });
   } catch (error) {
     return NextResponse.json(
@@ -124,7 +124,13 @@ export async function DELETE(request: NextRequest) {
     }
 
     const templatesPath = await getTemplatesPath();
-    const itemPath = path.join(templatesPath, itemId);
+    
+    const normalizedItemId = itemId.replace(/\\/g, path.sep);
+    const itemPath = path.join(templatesPath, normalizedItemId);
+    
+    if (!(await fs.pathExists(itemPath))) {
+      return NextResponse.json({ error: 'Item não encontrado' }, { status: 404 });
+    }
     
     await fs.remove(itemPath);
     
@@ -138,7 +144,7 @@ export async function DELETE(request: NextRequest) {
 }
 
 // Função auxiliar para ler estrutura de pastas
-async function readFolderStructure(basePath: string): Promise<FolderStructure[]> {
+async function readFolderStructure(basePath: string, relativePath: string = ''): Promise<FolderStructure[]> {
   const items = await fs.readdir(basePath);
   const folders: FolderStructure[] = [];
   const templates: FolderStructure[] = [];
@@ -147,12 +153,15 @@ async function readFolderStructure(basePath: string): Promise<FolderStructure[]>
   for (const item of items) {
     const itemPath = path.join(basePath, item);
     const stat = await fs.stat(itemPath);
+    
+    // Construir o caminho relativo completo para o item
+    const fullRelativePath = relativePath ? path.join(relativePath, item) : item;
 
     if (stat.isDirectory()) {
       // É uma pasta
-      const children = await readFolderStructure(itemPath);
+      const children = await readFolderStructure(itemPath, fullRelativePath);
       folders.push({
-        id: item,
+        id: fullRelativePath,
         name: item,
         type: 'folder',
         isExpanded: true,
@@ -162,10 +171,10 @@ async function readFolderStructure(basePath: string): Promise<FolderStructure[]>
       // É um template (arquivo JSON)
       const templateName = await getTemplateNameFromFile(itemPath);
       templates.push({
-        id: item.replace('.json', ''),
+        id: fullRelativePath, // Manter a extensão .json no ID
         name: templateName || item.replace('.json', ''),
         type: 'template',
-        path: item,
+        path: fullRelativePath,
         syncStatus: 'unknown'
       });
     }
@@ -185,3 +194,4 @@ async function getTemplateNameFromFile(filePath: string): Promise<string | null>
     return null;
   }
 }
+

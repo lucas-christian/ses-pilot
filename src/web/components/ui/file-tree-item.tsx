@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { InlineEditor } from '@/components/ui/inline-editor';
+import { useLanguage } from '@/components/providers/language-provider';
+import { useTranslation } from '@/lib/i18n';
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { 
   Folder, 
   FolderOpen, 
@@ -14,7 +16,8 @@ import {
   Trash2,
   Edit2,
   FolderPlus,
-  Plus
+  Plus,
+  GripVertical
 } from 'lucide-react';
 
 type InlineAction =
@@ -30,6 +33,7 @@ interface FileTreeItemProps {
     path: string;
     isExpanded?: boolean;
     children?: FileTreeItemProps['item'][];
+    syncStatus?: 'synced' | 'modified' | 'new_local' | 'unknown';
   };
   level?: number;
   onFolderToggle?: (folderId: string) => void;
@@ -39,9 +43,25 @@ interface FileTreeItemProps {
   createTemplate?: (parentId: string, name: string) => void;
   renameItem?: (itemId: string, newName: string, itemType: 'folder' | 'template') => void;
   deleteItem?: (itemId: string) => void;
+  moveItem?: (itemId: string, newParentId: string) => void;
   inlineAction?: InlineAction;
   setInlineAction?: (action: InlineAction) => void;
   rootFolderId?: string;
+}
+
+function SyncStatusIndicator({ status }: { status?: 'synced' | 'modified' | 'new_local' | 'unknown' }) {
+  const { locale } = useLanguage();
+  const { t } = useTranslation(locale);
+  
+  if (!status) return null;
+  const statusMap: Record<string, { variant: 'default' | 'secondary' | 'outline'; title: string }> = {
+    synced: { variant: 'default', title: t('templates.syncStatus.synced') },
+    modified: { variant: 'secondary', title: t('templates.syncStatus.modified') },
+    new_local: { variant: 'outline', title: t('templates.syncStatus.new_local') },
+    unknown: { variant: 'outline', title: t('templates.syncStatus.unknown') },
+  };
+  const { variant, title } = statusMap[status] || statusMap.unknown;
+  return <Badge variant={variant} className="text-xs">{title}</Badge>;
 }
 
 export function FileTreeItem({ 
@@ -54,6 +74,7 @@ export function FileTreeItem({
   createTemplate,
   renameItem,
   deleteItem,
+  moveItem,
   inlineAction,
   setInlineAction,
   rootFolderId
@@ -63,6 +84,52 @@ export function FileTreeItem({
   const isFolder = item.type === 'folder';
   const hasChildren = isFolder && item.children && item.children.length > 0;
   const isExpanded = !!item.isExpanded;
+
+  // Drag and drop - não permitir drag da pasta root
+  const canDrag = item.id !== rootFolderId;
+  
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    isDragging,
+  } = useDraggable({
+    id: item.id,
+    disabled: !canDrag,
+    data: {
+      type: item.type,
+      name: item.name,
+      path: item.path,
+    },
+  });
+
+  const {
+    setNodeRef: setDropRef,
+    isOver,
+    active,
+  } = useDroppable({
+    id: item.id,
+    data: {
+      type: item.type,
+      accepts: ['folder', 'template'],
+    },
+  });
+
+  const canDrop = active && active.id !== item.id && isFolder;
+  const isBeingDragged = isDragging;
+
+  // Handle drop
+  useEffect(() => {
+    if (isOver && canDrop && active && moveItem) {
+      const draggedItemId = active.id as string;
+      const targetFolderId = item.id;
+      
+      if (draggedItemId !== targetFolderId) {
+        console.log('Movendo item:', draggedItemId, 'para pasta:', targetFolderId);
+        moveItem(draggedItemId, targetFolderId);
+      }
+    }
+  }, [isOver, canDrop, active, moveItem, item.id]);
 
   // Fechar menu de ações quando clica fora
   useEffect(() => {
@@ -113,11 +180,33 @@ export function FileTreeItem({
   return (
     <div>
       <div
-        className="relative flex items-center gap-2 py-1 px-2 rounded hover:bg-accent/50 transition-colors cursor-pointer min-w-0"
-        style={{ paddingLeft: `${level * 12 + 8}px` }}
+        ref={(node) => {
+          setDragRef(node);
+          setDropRef(node);
+        }}
+        className={`relative flex items-center gap-2 py-1 px-2 rounded transition-all duration-200 cursor-pointer min-w-0 ${
+          isBeingDragged ? 'opacity-30 scale-95 shadow-lg' : ''
+        } ${
+          canDrop && isOver ? 'bg-blue-100 border-2 border-blue-400 border-dashed shadow-md scale-105' : 'hover:bg-accent/50'
+        } ${
+          !canDrag ? 'cursor-default' : ''
+        }`}
+        style={{ paddingLeft: `${level * 24 + 8}px` }}
         onClick={handleRowClick}
         onContextMenu={handleContextMenu}
+        {...attributes}
+        {...listeners}
       >
+        {/* drag handle - só aparece se pode ser arrastado */}
+        {canDrag && (
+          <div className="w-4 h-4 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted/50 rounded">
+            <GripVertical className="w-3 h-3 text-muted-foreground" />
+          </div>
+        )}
+        
+        {/* espaço vazio se não pode ser arrastado */}
+        {!canDrag && <div className="w-4 h-4" />}
+
         {/* expand icon */}
         {isFolder && (
           <div className="w-4 h-4 flex items-center justify-center">
@@ -152,15 +241,20 @@ export function FileTreeItem({
               }}
             />
           ) : (
-            <span className="text-sm truncate block">{item.name}</span>
+            <span className={`text-sm truncate block ${canDrop && isOver ? 'font-semibold text-blue-600' : ''}`}>
+              {item.name}
+              {canDrop && isOver && (
+                <span className="ml-2 text-xs text-blue-500">← Soltar aqui</span>
+              )}
+            </span>
           )}
         </div>
 
         {/* badge */}
         {!isFolder && (
-          <Badge variant="outline" className="text-xs mr-1">
-            {item.name.endsWith('.verification.json') ? 'Verificação' : 'E-mail'}
-          </Badge>
+          <div className="flex items-center gap-1 mr-1">
+            <SyncStatusIndicator status={item.syncStatus} />
+          </div>
         )}
 
         {/* actions button (visible on hover) */}
@@ -217,7 +311,7 @@ export function FileTreeItem({
 
       {/* inline create inside this folder (rendered as a child row) */}
       {inlineAction?.mode === 'create' && inlineAction.parentId === item.id && (
-        <div style={{ paddingLeft: `${(level + 1) * 12 + 8}px` }} className="mb-1">
+        <div style={{ paddingLeft: `${(level + 1) * 24 + 8}px` }} className="mb-1">
           <InlineEditor
             initialValue=""
             placeholder={inlineAction.type === 'folder' ? 'Nome da pasta' : 'Nome do template'}
@@ -248,6 +342,7 @@ export function FileTreeItem({
           createTemplate={createTemplate}
           renameItem={renameItem}
           deleteItem={deleteItem}
+          moveItem={moveItem}
           inlineAction={inlineAction}
           setInlineAction={setInlineAction}
           rootFolderId={rootFolderId}

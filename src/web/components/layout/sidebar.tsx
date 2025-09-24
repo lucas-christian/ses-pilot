@@ -12,61 +12,10 @@ import { LocalTemplatesList } from '@/components/ui/local-templates-list';
 import { useFileManager } from '@/hooks/use-file-manager';
 import { FileTreeItem } from '@/components/ui/file-tree-item';
 import { EnhancedContextMenu } from '@/components/ui/enhanced-context-menu';
-import { Mail, Folder, Loader2, ChevronDown, CloudDownload } from 'lucide-react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
+import { Folder, Loader2, ChevronDown, CloudDownload } from 'lucide-react';
 import { useState } from 'react';
 import { useConfig } from '@/hooks/use-config';
-
-function SyncStatusIndicator({ status }: { status: SyncedTemplateNode['syncStatus'] }) {
-  const { locale } = useLanguage();
-  const { t } = useTranslation(locale);
-  
-  if (!status) return null;
-  const statusMap: Record<string, { variant: 'default' | 'secondary' | 'outline'; title: string }> = {
-    synced: { variant: 'default', title: t('templates.syncStatus.synced') },
-    modified: { variant: 'secondary', title: t('templates.syncStatus.modified') },
-    new_local: { variant: 'outline', title: t('templates.syncStatus.new_local') },
-    unknown: { variant: 'outline', title: t('templates.syncStatus.unknown') },
-  };
-  const { variant, title } = statusMap[status] || statusMap.unknown;
-  return <Badge variant={variant} className="text-xs">{title}</Badge>;
-}
-
-function TemplateNodeView({ node, basePath, level = 0, onContextMenu }: { node: SyncedTemplateNode; basePath: string; level?: number; onContextMenu?: (e: React.MouseEvent, templateId: string) => void }) {
-  const pathname = usePathname();
-  const href = `${basePath}/${node.relativePath}`;
-  const isActive = pathname === href;
-  const isFolder = node.type === 'folder';
-  const Icon = isFolder ? Folder : Mail;
-
-  const handleContextMenu = (e: React.MouseEvent) => {
-    if (onContextMenu && !isFolder) {
-      onContextMenu(e, node.relativePath);
-    }
-  };
-
-  return (
-    <div className="w-full">
-      <Link href={href} className="block w-full">
-        <div 
-          className={`flex items-center justify-between p-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors w-full ${isActive ? 'bg-accent' : ''}`} 
-          style={{ paddingLeft: `${1 + level * 1.5}rem` }}
-          onContextMenu={handleContextMenu}
-        >
-          <div className="flex items-center truncate gap-2 flex-1">
-            <Icon className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">{node.name}</span>
-          </div>
-          {!isFolder && <SyncStatusIndicator status={node.syncStatus} />}
-        </div>
-      </Link>
-      {isFolder && node.children && (
-        <div>{node.children.map((child: SyncedTemplateNode) => <TemplateNodeView key={child.relativePath} node={child} basePath={basePath} level={level + 1} onContextMenu={onContextMenu} />)}</div>
-      )}
-    </div>
-  );
-}
 
 
 function VerificationTemplatesSection() {
@@ -78,7 +27,8 @@ function VerificationTemplatesSection() {
     createFolder, 
     createTemplate,
     renameItem,
-    deleteItem
+    deleteItem,
+    moveItem
   } = useFileManager();
   
   const { config, updateConfig } = useConfig();
@@ -267,20 +217,6 @@ function VerificationTemplatesSection() {
                 {/* Lista de templates da AWS */}
                 <AWSTemplatesList 
                   isVisible={showAWSTemplates}
-                />
-              </div>
-            ) : showLocalTemplates ? (
-              <div className="space-y-2">
-                {/* Header Local Templates */}
-                <div 
-                  className="flex items-center justify-between p-1 rounded"
-                >
-                  <h4 className="text-sm font-medium">Templates Locais</h4>
-                </div>
-                
-                {/* Lista de templates locais */}
-                <LocalTemplatesList 
-                  isVisible={showLocalTemplates}
                 />
               </div>
             ) : (
