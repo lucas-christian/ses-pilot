@@ -37,7 +37,10 @@ export default function VerificationTemplatePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isNewTemplate, setIsNewTemplate] = useState(false);
   const [showMaximizedPreview, setShowMaximizedPreview] = useState(false);
+  const [showMaximizedHtmlEditor, setShowMaximizedHtmlEditor] = useState(false);
   const [showHtmlEditor, setShowHtmlEditor] = useState(false);
+  const [showEditorPanel, setShowEditorPanel] = useState(true);
+  const [showPreviewPanel, setShowPreviewPanel] = useState(true);
 
   const templatePath = params.slug ? (Array.isArray(params.slug) ? params.slug.join('/') : params.slug) : null;
 
@@ -446,6 +449,7 @@ export default function VerificationTemplatePage() {
         </Card>
       )}
 
+
       {/* HTML Editor Modal */}
       <Dialog open={showHtmlEditor} onOpenChange={setShowHtmlEditor}>
         <DialogContent className="max-w-7xl w-[95vw] h-[95vh] p-0 flex flex-col">
@@ -455,39 +459,87 @@ export default function VerificationTemplatePage() {
               Edite o conteúdo HTML e visualize o resultado em tempo real
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 p-6 pt-2 min-h-0 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="flex-1 p-6 pt-2 min-h-0 flex gap-6">
             {/* HTML Editor */}
-            <div className="flex flex-col">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium">Editor HTML</h3>
-                <div className="text-xs text-muted-foreground">
-                  {template.htmlContent.length} caracteres
+            <div className={`flex flex-col transition-all duration-300 ${showEditorPanel ? 'flex-1 min-w-0' : 'w-48 flex-shrink-0'}`}>
+              {showEditorPanel ? (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium">Editor HTML</h3>
+                    <div className="flex items-center gap-2">
+                      <div className="text-xs text-muted-foreground">
+                        {template.htmlContent.length} caracteres
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowMaximizedHtmlEditor(true)}
+                      >
+                        <Maximize2 className="w-4 h-4 mr-1" />
+                        Maximizar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowEditorPanel(false)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex-1 border rounded-md overflow-hidden">
+                    <CodeEditor
+                      value={template.htmlContent}
+                      onChange={(value) => setTemplate({ ...template, htmlContent: value || '' })}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full border-2 border-dashed border-muted-foreground/25 rounded-lg">
+                  <Button onClick={() => setShowEditorPanel(true)}>
+                    <Code className="w-4 h-4 mr-2" />
+                    Mostrar Editor
+                  </Button>
                 </div>
-              </div>
-              <div className="flex-1 border rounded-md overflow-hidden">
-                <CodeEditor
-                  value={template.htmlContent}
-                  onChange={(value) => setTemplate({ ...template, htmlContent: value || '' })}
-                />
-              </div>
+              )}
             </div>
 
             {/* Preview */}
-            <div className="flex flex-col">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium">Preview</h3>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowMaximizedPreview(true)}
-                >
-                  <Maximize2 className="w-4 h-4 mr-2" />
-                  Maximizar
-                </Button>
-              </div>
-              <div className="flex-1 border rounded-md overflow-hidden">
-                <PreviewPanel htmlContent={template.htmlContent} />
-              </div>
+            <div className={`flex flex-col transition-all duration-300 ${showPreviewPanel ? 'flex-1 min-w-0' : 'w-48 flex-shrink-0'}`}>
+              {showPreviewPanel ? (
+                <>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium">Preview</h3>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowMaximizedPreview(true)}
+                      >
+                        <Maximize2 className="w-4 h-4 mr-1" />
+                        Maximizar
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowPreviewPanel(false)}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex-1 border rounded-md overflow-hidden">
+                    <PreviewPanel htmlContent={template.htmlContent} />
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full border-2 border-dashed border-muted-foreground/25 rounded-lg">
+                  <Button onClick={() => setShowPreviewPanel(true)}>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Mostrar Preview
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
           <DialogFooter className="p-6 pt-0 flex-shrink-0">
@@ -515,6 +567,35 @@ export default function VerificationTemplatePage() {
               <PreviewPanel htmlContent={template.htmlContent} />
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Maximized HTML Editor Modal */}
+      <Dialog open={showMaximizedHtmlEditor} onOpenChange={setShowMaximizedHtmlEditor}>
+        <DialogContent className="max-w-7xl w-[95vw] h-[95vh] p-0 flex flex-col">
+          <DialogHeader className="p-6 pb-2 flex-shrink-0">
+            <DialogTitle>Editor HTML - Edição Completa</DialogTitle>
+            <DialogDescription>
+              Edição em tela cheia do conteúdo HTML do template
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 p-6 pt-2 min-h-0">
+            <div className="h-full">
+              <CodeEditor
+                value={template.htmlContent}
+                onChange={(value) => setTemplate(prev => prev ? { ...prev, htmlContent: value || '' } : null)}
+                language="html"
+              />
+            </div>
+          </div>
+          <DialogFooter className="p-6 pt-2 flex-shrink-0">
+            <Button variant="outline" onClick={() => setShowMaximizedHtmlEditor(false)}>
+              Fechar
+            </Button>
+            <Button onClick={() => setShowMaximizedHtmlEditor(false)}>
+              Salvar e Fechar
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
