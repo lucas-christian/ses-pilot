@@ -16,7 +16,6 @@ export async function deployTemplate(templateDetails: { htmlContent: string; tem
     throw new Error('O nome do template (TemplateName) não foi encontrado no template.json.');
   }
   
-  console.log(`Deploying template: "${TemplateName}"`);
 
   // 1. Replica a lógica do PowerShell para colocar o HTML em uma linha única.
   const oneLineHtml = templateDetails.htmlContent
@@ -24,7 +23,6 @@ export async function deployTemplate(templateDetails: { htmlContent: string; tem
     .replace(/\s{2,}/g, ' ')  // Substitui 2 ou mais espaços/tabs por um único espaço
     .trim();                  // Remove espaços no início e no fim
     
-  console.log(`HTML processado: ${oneLineHtml.substring(0, 100)}...`);
 
   // 2. Prepara o payload JSON para a AWS CLI.
   const awsTemplatePayload = {
@@ -35,30 +33,21 @@ export async function deployTemplate(templateDetails: { htmlContent: string; tem
     },
   };
   
-  console.log(`Template payload:`, JSON.stringify(awsTemplatePayload, null, 2));
-  console.log(`Template name type:`, typeof TemplateName);
-  console.log(`Template name value:`, TemplateName);
   
   // 3. Salva o payload em arquivo temporário
   const tempJsonPath = path.join(os.tmpdir(), `ses-pilot-${Date.now()}.json`);
-  console.log(`Salvando payload em: ${tempJsonPath}`);
   await fs.writeJson(tempJsonPath, awsTemplatePayload);
 
   try {
     // 4. Verifica se o template já existe na AWS
     try {
-      console.log(`Executando comando: aws sesv2 get-email-template --template-name ${TemplateName}`);
       await execa('aws', ['sesv2', 'get-email-template', '--template-name', TemplateName]);
       // Se não deu erro, o template existe. Vamos atualizá-lo.
-      console.log(`Template "${TemplateName}" encontrado na AWS. Atualizando...`);
-      console.log(`Executando comando: aws sesv2 update-email-template --cli-input-json file://${tempJsonPath}`);
       await execa('aws', ['sesv2', 'update-email-template', '--cli-input-json', `file://${tempJsonPath}`]);
     } catch (error: unknown) {
       // Se o erro contém "NotFoundException", o template não existe. Vamos criá-lo.
       const errorMessage = (error as { stderr?: string; message?: string }).stderr || (error as { message?: string }).message || '';
       if (errorMessage.includes('NotFoundException')) {
-        console.log(`Template "${TemplateName}" não encontrado na AWS. Criando...`);
-        console.log(`Executando comando: aws sesv2 create-email-template --cli-input-json file://${tempJsonPath}`);
         await execa('aws', ['sesv2', 'create-email-template', '--cli-input-json', `file://${tempJsonPath}`]);
       } else {
         // Se for outro tipo de erro no 'get', relança para ser pego pelo catch principal.
@@ -72,7 +61,6 @@ export async function deployTemplate(templateDetails: { htmlContent: string; tem
     throw new Error(`Falha no deploy via AWS CLI: ${errorMessage}`);
   } finally {
     // 5. Garante que o arquivo temporário seja sempre deletado
-    console.log(`Removendo arquivo temporário: ${tempJsonPath}`);
     await fs.remove(tempJsonPath);
   }
 }
@@ -118,12 +106,10 @@ export async function deployVerificationTemplate(templateDetails: {
     try {
       // Executa o comando de criação/atualização do template de verificação
       await execa('aws', ['sesv2', 'create-custom-verification-email-template', '--cli-input-json', `file://${tempJsonPath}`]);
-      console.log(`Template de verificação "${templateDetails.templateJson.Template.TemplateName}" criado/atualizado com sucesso.`);
     } catch (createError) {
       // Se falhar na criação, tenta atualizar
       try {
         await execa('aws', ['sesv2', 'update-custom-verification-email-template', '--cli-input-json', `file://${tempJsonPath}`]);
-        console.log(`Template de verificação "${templateDetails.templateJson.Template.TemplateName}" atualizado com sucesso.`);
       } catch {
         throw createError; // Re-throw o erro original se ambos falharem
       }
@@ -162,7 +148,6 @@ export async function listRemoteTemplates(): Promise<RemoteTemplate[]> {
         args.push('--next-token', nextToken);
       }
 
-      console.log(`Executando comando: aws ${args.join(' ')}`);
       const { stdout } = await execa('aws', args);
       const result = JSON.parse(stdout);
 
@@ -191,13 +176,9 @@ export async function listRemoteTemplates(): Promise<RemoteTemplate[]> {
  */
 export async function getRemoteTemplateContent(templateName: string) {
   try {
-    console.log(`Buscando template: "${templateName}"`);
-    console.log(`Template name type:`, typeof templateName);
-    console.log(`Template name value:`, templateName);
     
     // Primeiro tenta como template regular
     try {
-      console.log(`Tentando como template regular: aws sesv2 get-email-template --template-name ${templateName}`);
       const { stdout } = await execa('aws', ['sesv2', 'get-email-template', '--template-name', templateName]);
       const result = JSON.parse(stdout);
       const content = result.TemplateContent;
@@ -210,11 +191,8 @@ export async function getRemoteTemplateContent(templateName: string) {
       };
     } catch {
       // Se falhar, tenta como template de verificação
-      console.log(`Template regular não encontrado, tentando como template de verificação...`);
-      console.log(`Executando comando: aws sesv2 get-custom-verification-email-template --template-name ${templateName}`);
       const { stdout } = await execa('aws', ['sesv2', 'get-custom-verification-email-template', '--template-name', templateName]);
       const result = JSON.parse(stdout);
-      console.log(`Resposta da AWS:`, JSON.stringify(result, null, 2));
       
       if (!result.TemplateContent || !result.TemplateSubject) {
         throw new Error('A resposta da AWS não contém o conteúdo esperado.');
@@ -222,6 +200,9 @@ export async function getRemoteTemplateContent(templateName: string) {
       return {
         Subject: result.TemplateSubject,
         Html: result.TemplateContent,
+        FromEmailAddress: result.FromEmailAddress,
+        SuccessRedirectionURL: result.SuccessRedirectionURL,
+        FailureRedirectionURL: result.FailureRedirectionURL,
       };
     }
   } catch (error: unknown) {
@@ -253,7 +234,6 @@ export async function listRemoteVerificationTemplates(): Promise<RemoteVerificat
         args.push('--next-token', nextToken);
       }
 
-      console.log(`Executando comando: aws ${args.join(' ')}`);
       const { stdout } = await execa('aws', args);
       const result = JSON.parse(stdout);
 

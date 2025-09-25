@@ -36,20 +36,17 @@ export async function getTemplatesPath(): Promise<string> {
     if (await fs.pathExists(configPath)) {
       config = await fs.readJson(configPath);
       configSourcePath = path.dirname(configPath);
-      console.log(`Arquivo de configuração encontrado em: ${configPath}`);
       break;
     }
   }
 
   if (!config || !configSourcePath) {
-    console.log('Caminhos testados:', possibleConfigPaths);
     throw new Error('Nenhum arquivo de configuração do ses-pilot foi encontrado. Rode `ses-pilot init`.');
   }
 
   // Resolve o caminho do template para um caminho absoluto.
   // Isso é importante porque o caminho no JSON pode ser relativo (ex: "./ses-templates").
   const absoluteTemplatesPath = path.resolve(configSourcePath, config.templatesPath);
-  console.log(`Caminho dos templates: ${absoluteTemplatesPath}`);
   
   cachedConfig = { templatesPath: absoluteTemplatesPath };
 

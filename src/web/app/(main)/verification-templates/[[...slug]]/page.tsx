@@ -117,7 +117,10 @@ export default function VerificationTemplatePage() {
       const response = await fetch('/api/verification-templates/deploy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slug: templatePath?.split('/') || [] }),
+        body: JSON.stringify({ 
+          slug: templatePath?.split('/') || [],
+          templateData: template
+        }),
       });
       
       if (response.ok) {

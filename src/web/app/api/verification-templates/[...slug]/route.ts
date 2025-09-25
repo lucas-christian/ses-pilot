@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { deleteTemplate, getTemplateDetails, updateTemplate } from '@/lib/file-system';
 import { getTemplatesPath } from '@/lib/config';
 import { deployVerificationTemplate } from '@/lib/aws';
+import { minifyHtml, normalizeFromEmailAddress, normalizeText, decodeHtmlEntities } from '@/lib/template-utils';
+import fs from 'fs-extra';
+import path from 'path';
 
 export async function GET(
   request: Request,
@@ -18,7 +21,45 @@ export async function GET(
   }
 
   try {
-    // Para templates de verificação, adicionamos o prefixo _verification
+    // Primeiro tenta como arquivo .verification.json direto no diretório raiz
+    const templateName = slug.join('/');
+    const verificationJsonPath = path.join(templatesPath, `${templateName}.verification.json`);
+    
+    if (await fs.pathExists(verificationJsonPath)) {
+      // Lê o arquivo .verification.json diretamente
+      const templateJson = await fs.readJson(verificationJsonPath);
+      
+      // Usa o HtmlPart do arquivo .verification.json
+      let htmlContent = '';
+      
+      if (templateJson.HtmlPart) {
+        htmlContent = templateJson.HtmlPart;
+      } else {
+        // Se não encontrar HtmlPart, procura por um arquivo HTML correspondente
+        const htmlPath = path.join(templatesPath, `${templateName}.html`);
+        if (await fs.pathExists(htmlPath)) {
+          htmlContent = await fs.readFile(htmlPath, 'utf-8');
+        } else {
+          // Se não encontrar HTML, usa um template padrão
+          htmlContent = '<html><body><h1>Template de Verificação</h1><p>Conteúdo HTML não encontrado.</p></body></html>';
+        }
+      }
+      
+      // Decodifica entidades HTML para exibição
+      const decodedHtmlContent = decodeHtmlEntities(htmlContent);
+      const decodedTemplateJson = {
+        ...templateJson,
+        Template: {
+          ...templateJson.Template,
+          SubjectPart: decodeHtmlEntities(templateJson.Template.SubjectPart || '')
+        },
+        FromEmailAddress: decodeHtmlEntities(templateJson.FromEmailAddress || '')
+      };
+      
+      return NextResponse.json({ htmlContent: decodedHtmlContent, templateJson: decodedTemplateJson });
+    }
+    
+    // Se não encontrar como arquivo direto, tenta a estrutura de pastas _verification
     const verificationPath = ['_verification', ...slug];
     const details = await getTemplateDetails(templatesPath, verificationPath);
     return NextResponse.json(details);
@@ -58,7 +99,36 @@ export async function PUT(request: Request, { params }: { params: Promise<{ slug
       );
     }
 
-    // Para templates de verificação, adicionamos o prefixo _verification
+    // Primeiro tenta como arquivo .verification.json direto no diretório raiz
+    const templateName = slug.join('/');
+    const verificationJsonPath = path.join(templatesPath, `${templateName}.verification.json`);
+    
+    if (await fs.pathExists(verificationJsonPath)) {
+      // Minifica o HTML
+      const minifiedHtml = await minifyHtml(htmlContent);
+      
+      // Normaliza o e-mail de origem
+      const normalizedFromEmail = normalizeFromEmailAddress(templateJson.FromEmailAddress);
+      
+      // Atualiza o arquivo .verification.json com o HTML minificado e e-mail normalizado
+      const updatedTemplateJson = {
+        ...templateJson,
+        HtmlPart: minifiedHtml,
+        FromEmailAddress: normalizedFromEmail,
+        Template: {
+          ...templateJson.Template,
+          SubjectPart: normalizeText(templateJson.Template.SubjectPart || 'Confirme seu e-mail')
+        }
+      };
+      await fs.writeJson(verificationJsonPath, updatedTemplateJson, { spaces: 2 });
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Template de verificação atualizado com sucesso!' 
+      });
+    }
+    
+    // Se não encontrar como arquivo direto, tenta a estrutura de pastas _verification
     const verificationPath = ['_verification', ...slug];
     await updateTemplate(templatesPath, verificationPath, { htmlContent, templateJson });
     
@@ -238,7 +308,27 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ s
   }
 
   try {
-    // Para templates de verificação, adicionamos o prefixo _verification
+    // Primeiro tenta como arquivo .verification.json direto no diretório raiz
+    const templateName = slug.join('/');
+    const verificationJsonPath = path.join(templatesPath, `${templateName}.verification.json`);
+    
+    if (await fs.pathExists(verificationJsonPath)) {
+      // Remove o arquivo .verification.json
+      await fs.remove(verificationJsonPath);
+      
+      // Remove o arquivo HTML correspondente se existir
+      const htmlPath = path.join(templatesPath, `${templateName}.html`);
+      if (await fs.pathExists(htmlPath)) {
+        await fs.remove(htmlPath);
+      }
+      
+      return NextResponse.json({ 
+        success: true, 
+        message: 'Template de verificação excluído com sucesso!' 
+      });
+    }
+    
+    // Se não encontrar como arquivo direto, tenta a estrutura de pastas _verification
     const verificationPath = ['_verification', ...slug];
     await deleteTemplate(templatesPath, verificationPath);
     

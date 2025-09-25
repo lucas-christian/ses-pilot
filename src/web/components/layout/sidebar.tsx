@@ -1,6 +1,5 @@
 'use client';
 
-import { SyncedTemplateNode } from '@/app/api/verification-templates/sync-status/route';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,154 +7,129 @@ import { SettingsDropdown } from '@/components/ui/settings-dropdown';
 import { useLanguage } from '@/components/providers/language-provider';
 import { useTranslation } from '@/lib/i18n';
 import { AWSTemplatesList } from '@/components/ui/aws-templates-list';
-import { LocalTemplatesList } from '@/components/ui/local-templates-list';
 import { useFileManager } from '@/hooks/use-file-manager';
-import { FileTreeItem } from '@/components/ui/file-tree-item';
-import { EnhancedContextMenu } from '@/components/ui/enhanced-context-menu';
-import { DndContext, DragEndEvent } from '@dnd-kit/core';
-import { Folder, Loader2, ChevronDown, CloudDownload } from 'lucide-react';
+import { TemplateItem } from '@/components/ui/file-tree-item';
+import { InlineEditor } from '@/components/ui/inline-editor';
+import { DeleteConfirmationModal } from '@/components/ui/delete-confirmation-modal';
+import { Loader2, ChevronDown, CloudDownload, FileText, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { useConfig } from '@/hooks/use-config';
+import Link from 'next/link';
 
 
 function VerificationTemplatesSection() {
   const { 
-    items, 
+    templates, 
     isLoading, 
-    error, 
-    toggleFolder, 
-    createFolder, 
-    createTemplate,
-    renameItem,
-    deleteItem,
-    moveItem
+    error
   } = useFileManager();
-  
-  const { config, updateConfig } = useConfig();
   
   const { locale } = useLanguage();
   const { t } = useTranslation(locale);
   const [isExpanded, setIsExpanded] = useState(true);
   const [showAWSTemplates, setShowAWSTemplates] = useState(false);
-  const [showLocalTemplates, setShowLocalTemplates] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{
+  const [showCreateEditor, setShowCreateEditor] = useState(false);
+  const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean;
-    position: { x: number; y: number };
-    targetItemId?: string;
-    targetItemType?: 'folder' | 'template';
-  }>({ isOpen: false, position: { x: 0, y: 0 } });
-  
-  const [inlineAction, setInlineAction] = useState<{
-    mode: 'create';
-    parentId: string;
-    type: 'folder' | 'template';
-  } | {
-    mode: 'rename';
-    itemId: string;
-    oldName: string;
-  } | null>(null);
+    templateId: string;
+    templateName: string;
+    isLoading: boolean;
+  }>({
+    isOpen: false,
+    templateId: '',
+    templateName: '',
+    isLoading: false
+  });
 
-  const handleContextAction = (action: string, data?: { name?: string; itemId?: string; itemType?: string }) => {
-    const targetItemId = contextMenu.targetItemId || getRootFolderId();
-    
-    switch (action) {
-      case 'create-folder':
-        createFolder(targetItemId, data?.name || 'verification');
-        break;
-      case 'create-template':
-        createTemplate(targetItemId, data?.name || 'Novo Template');
-        break;
-      case 'rename':
-        if (data?.name && contextMenu.targetItemId && contextMenu.targetItemType) {
-          // Usar a função de renomeação apropriada baseada no item
-          if (contextMenu.targetItemId === getRootFolderId()) {
-            handleRootRename(data.name);
-          } else {
-            renameItem(contextMenu.targetItemId, data.name, contextMenu.targetItemType);
-          }
-        }
-        break;
-      case 'delete':
-        if (contextMenu.targetItemId) {
-          deleteItem(contextMenu.targetItemId);
-        }
-        break;
+  const handleTemplateClick = (template: { id: string; name: string; path: string }) => {
+    const templateName = template.name.replace('.verification.json', '');
+    window.location.href = `/verification-templates/${templateName}`;
+  };
+
+  const handleTemplateDelete = (templateId: string) => {
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+      setDeleteModal({
+        isOpen: true,
+        templateId,
+        templateName: template.name,
+        isLoading: false
+      });
     }
+  };
+
+  const handleDeleteConfirm = async () => {
+    setDeleteModal(prev => ({ ...prev, isLoading: true }));
     
-    // Sempre fechar o menu após qualquer ação
-    setContextMenu({ isOpen: false, position: { x: 0, y: 0 } });
-  };
-
-  const handleItemContextMenu = (e: React.MouseEvent, itemId: string, itemType: 'folder' | 'template') => {
-    e.preventDefault();
-    setContextMenu({
-      isOpen: true,
-      position: { x: e.clientX, y: e.clientY },
-      targetItemId: itemId,
-      targetItemType: itemType
-    });
-  };
-
-  const handleLocalContextMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setContextMenu({
-      isOpen: true,
-      position: { x: e.clientX, y: e.clientY },
-      targetItemId: 'ses-templates',
-      targetItemType: 'folder'
-    });
-  };
-
-  const handleItemClick = (item: { id: string; name: string; path: string; type: 'folder' | 'template' }) => {
-    if (item.type === 'template') {
-      if (item.path) {
-        window.location.href = `/verification-templates/${item.path}`;
+    try {
+      const response = await fetch(`/api/verification-templates/${deleteModal.templateId}`, {
+        method: 'DELETE',
+      });
+      
+      if (response.ok) {
+        setDeleteModal(prev => ({ ...prev, isOpen: false }));
+        window.location.href = '/';
       } else {
-        // Para templates locais, usar o nome como path
-        const templateName = item.name.replace('.verification.json', '');
-        window.location.href = `/verification-templates/${templateName}`;
+        alert('Erro ao deletar template');
+        setDeleteModal(prev => ({ ...prev, isLoading: false }));
       }
+    } catch {
+      alert('Erro ao deletar template');
+      setDeleteModal(prev => ({ ...prev, isLoading: false }));
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteModal({
+      isOpen: false,
+      templateId: '',
+      templateName: '',
+      isLoading: false
+    });
+  };
+
+  const handleCreateTemplate = () => {
+    setShowCreateEditor(true);
+  };
+
+  const handleCreateTemplateSubmit = async (templateName: string) => {
+    if (!templateName || !templateName.trim()) {
+      setShowCreateEditor(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/verification-templates/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ templateName: templateName.trim() }),
+      });
+
+      if (response.ok) {
+        window.location.href = `/verification-templates/${templateName.trim()}`;
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Erro ao criar template');
+      }
+    } catch {
+      alert('Erro ao criar template');
+    } finally {
+      setShowCreateEditor(false);
+    }
+  };
+
+  const handleCreateTemplateCancel = () => {
+    setShowCreateEditor(false);
   };
 
   const handleAWSExplorerClick = () => {
     setShowAWSTemplates(!showAWSTemplates);
-    setShowLocalTemplates(false);
-  };
-
-  const handleLocalExplorerClick = () => {
-    setShowLocalTemplates(!showLocalTemplates);
-    setShowAWSTemplates(false);
-  };
-
-  const handleRootRename = async (newName: string) => {
-    try {
-      // Atualizar o arquivo de configuração
-      await updateConfig({
-        templatesPath: `./${newName}`
-      });
-      
-      // Atualizar o nome da pasta no sistema de arquivos
-      // Aqui você pode adicionar lógica para renomear a pasta física se necessário
-      
-      // Recarregar a página para refletir as mudanças
-      window.location.reload();
-    } catch (error) {
-      console.error('Erro ao renomear pasta raiz:', error);
-    }
-  };
-
-  // Obter o ID da pasta raiz baseado na configuração
-  const getRootFolderId = () => {
-    if (!config) return 'ses-templates';
-    const pathParts = config.templatesPath.split('/');
-    return pathParts[pathParts.length - 1] || 'ses-templates';
   };
 
 
   return (
     <div className="space-y-3">
-      {/* Header com título e botões de ação */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button
@@ -174,26 +148,23 @@ function VerificationTemplatesSection() {
             {t('verification.title')}
           </h3>
           <Badge variant="secondary" className="text-xs">
-            {items.length}
+            {templates.length}
           </Badge>
         </div>
       </div>
 
-
-      {/* Conteúdo do accordion */}
       {isExpanded && (
-        <Card className="border-0 bg-muted/30" onContextMenu={handleLocalContextMenu}>
+        <Card className="border-0 bg-muted/30">
           <CardContent className="p-3">
-            {/* Botões centralizados */}
-            <div className="flex items-center justify-center gap-4 mb-1 pb-3 border-b border-muted">
+            <div className="relative flex items-center justify-center gap-4 mb-4 pb-3 border-b border-muted">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleLocalExplorerClick}
+                onClick={() => setShowAWSTemplates(false)}
                 className="p-2 h-auto hover:bg-muted/50"
                 title="List Local Templates"
               >
-                <Folder className="w-4 h-4" />
+                <FileText className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
@@ -204,17 +175,29 @@ function VerificationTemplatesSection() {
               >
                 <CloudDownload className="w-4 h-4" />
               </Button>
+              
+              {/* Botão + centralizado na linha */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleCreateTemplate}
+                className="absolute p-1 h-auto bg-muted rounded-full border border-muted hover:p-1.5 transition-all duration-200"
+                style={{ 
+                  bottom: '0', 
+                  transform: 'translateY(50%)'
+                }}
+                title="Criar Novo Template"
+              >
+                <Plus className="w-4 h-4" />
+              </Button>
             </div>
 
-            {/* Conteúdo baseado no modo selecionado */}
             {showAWSTemplates ? (
               <div className="space-y-2">
-                {/* Header Amazon Templates */}
                 <div className="flex items-center justify-between p-1">
                   <h4 className="text-sm font-medium">Amazon Templates</h4>
                 </div>
                 
-                {/* Lista de templates da AWS */}
                 <AWSTemplatesList 
                   isVisible={showAWSTemplates}
                 />
@@ -232,47 +215,42 @@ function VerificationTemplatesSection() {
                     {t('common.error')}
                   </p>
                 )}
-
-                <div 
-                  className="space-y-1 min-h-32"
-                  onContextMenu={handleLocalContextMenu}
-                >
-                  {items.map((item) => (
-                    <FileTreeItem
-                      key={item.id}
-                      item={item}
-                      onFolderToggle={toggleFolder}
-                      onItemContextMenu={handleItemContextMenu}
-                      onItemClick={handleItemClick}
-                      createFolder={createFolder}
-                      createTemplate={createTemplate}
-                      renameItem={item.id === getRootFolderId() ? handleRootRename : renameItem}
-                      deleteItem={deleteItem}
-                      inlineAction={inlineAction}
-                      setInlineAction={setInlineAction}
-                      rootFolderId={getRootFolderId()}
+                {showCreateEditor && (
+                  <InlineEditor
+                    initialValue=""
+                    placeholder="Nome do template"
+                    onCancel={handleCreateTemplateCancel}
+                    onSubmit={handleCreateTemplateSubmit}
+                  />
+                )}
+                <div className="space-y-1 min-h-32">
+                  {templates.map((template) => (
+                    <TemplateItem
+                      key={template.id}
+                      template={template}
+                      onTemplateClick={handleTemplateClick}
+                      onTemplateDelete={handleTemplateDelete}
                     />
                   ))}
                 </div>
               </>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Context Menu */}
-      <EnhancedContextMenu
-        isOpen={contextMenu.isOpen}
-        position={contextMenu.position}
-        onClose={() => setContextMenu({ isOpen: false, position: { x: 0, y: 0 } })}
-        onAction={handleContextAction}
-        itemType={contextMenu.targetItemType}
-        isRoot={contextMenu.targetItemId === getRootFolderId()}
-        isRootFolder={contextMenu.targetItemId === getRootFolderId()}
-      />
-    </div>
-  );
-}
+                )}
+              </CardContent>
+            </Card>
+          )}
+          
+          <DeleteConfirmationModal
+            isOpen={deleteModal.isOpen}
+            onClose={handleDeleteCancel}
+            onConfirm={handleDeleteConfirm}
+            title="Deletar Template"
+            description="Esta ação não pode ser desfeita. O template será permanentemente removido."
+            itemName={deleteModal.templateName}
+            isLoading={deleteModal.isLoading}
+          />
+        </div>
+      );
+    }
 
 export function Sidebar() {
   const { locale, setLocale } = useLanguage();
@@ -280,7 +258,9 @@ export function Sidebar() {
   return (
     <aside className="w-80 h-full border-r bg-muted/40 p-4 flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">SES Pilot</h2>
+        <Link href="/">
+          <h2 className="text-lg font-semibold">SES Pilot</h2>
+        </Link>
       </div>
       
       <div className="flex-1 overflow-auto flex flex-col gap-4">

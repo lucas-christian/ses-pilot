@@ -89,53 +89,42 @@ export async function getTemplateDetails(rootDir: string, slug: string[]) {
 }
 
 /**
- * Cria uma nova estrutura de template (pasta e arquivos base).
+ * Cria um novo template de verificação como arquivo .verification.json direto no diretório raiz.
  * @param rootDir O caminho raiz dos templates.
- * @param relativePath O caminho relativo onde a nova pasta será criada (ex: "marketing").
- * @param templateName O nome da nova pasta do template.
- * @param subject O assunto inicial para o template.
+ * @param templateName O nome do template.
+ * @returns Uma promessa que resolve para o caminho do template criado.
  */
-export async function createTemplate(rootDir: string, relativePath: string, templateName: string, subject: string) {
-  const newTemplateDir = path.join(rootDir, relativePath, templateName);
+export async function createVerificationTemplate(rootDir: string, templateName: string) {
+  const verificationJsonPath = path.join(rootDir, `${templateName}.verification.json`);
 
-  if (await fs.pathExists(newTemplateDir)) {
-    throw new Error('Um template com este nome já existe neste local.');
+  if (await fs.pathExists(verificationJsonPath)) {
+    throw new Error('Um template com este nome já existe.');
   }
-  await fs.ensureDir(newTemplateDir);
 
-  const boilerplate = {
-    html: `<!DOCTYPE html>
-<html>
-  <head>
-    <title>${subject}</title>
-  </head>
-  <body>
-    <h1>Olá, {{name}}!</h1>
-    <p>Este é seu novo template.</p>
-  </body>
-</html>`,
-    templateJson: {
-      Template: {
-        TemplateName: `${templateName}Template`, // Sugestão de nome para a AWS
-        SubjectPart: subject,
-        HtmlPart: "" // Será preenchido no deploy
-      }
+  const templateJson = {
+    Template: {
+      TemplateName: templateName,
+      SubjectPart: 'Confirme seu e-mail'
     },
-    sendJson: {
-      Source: "sender@example.com",
-      Template: `${templateName}Template`,
-      Destination: { ToAddresses: ["recipient@example.com"] },
-      TemplateData: JSON.stringify({ name: "Usuário Teste" })
-    }
+    HtmlPart: `<!DOCTYPE html>
+<html>
+<head>
+    <title>Confirmação de E-mail</title>
+</head>
+<body>
+    <h1>Confirme seu e-mail</h1>
+    <p>Clique no link abaixo para confirmar seu endereço de e-mail:</p>
+    <a href="{{verificationLink}}">Confirmar E-mail</a>
+</body>
+</html>`,
+    FromEmailAddress: 'noreply@example.com',
+    SuccessRedirectionURL: 'https://example.com/success',
+    FailureRedirectionURL: 'https://example.com/failure'
   };
 
-  await Promise.all([
-    fs.writeFile(path.join(newTemplateDir, 'template.html'), boilerplate.html),
-    fs.writeJson(path.join(newTemplateDir, 'template.json'), boilerplate.templateJson, { spaces: 2 }),
-    fs.writeJson(path.join(newTemplateDir, 'send-email.json'), boilerplate.sendJson, { spaces: 2 }),
-  ]);
+  await fs.writeJson(verificationJsonPath, templateJson, { spaces: 2 });
 
-  return { path: path.join(relativePath, templateName) };
+  return { path: templateName };
 }
 
 /**
