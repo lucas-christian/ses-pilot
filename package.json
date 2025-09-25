@@ -1,8 +1,7 @@
 {
   "name": "@dev-luch/ses-pilot",
-  "version": "1.0.1",
+  "version": "1.5.0",
   "description": "A CLI tool to manage AWS SES email templates. (Dev Luch AWS SES Manager)",
-  "private": true,
   "type": "module",
   "workspaces": [
     "src/web"
@@ -12,10 +11,7 @@
   },
   "main": "dist/index.js",
   "files": [
-    "dist",
-    "src/web/.next",
-    "src/web/public",
-    "src/web/next.config.js"
+    "dist"
   ],
   "scripts": {
     "dev:cli": "tsx src/cli/index.ts",
@@ -23,8 +19,13 @@
     "dev": "concurrently \"npm:dev:cli\" \"npm:dev:web\"",
     "build:cli": "tsc --project tsconfig.cli.json",
     "build:web": "npm run build --workspace=src/web",
-    "build": "npm run build:cli && npm run build:web",
-    "start": "node dist/index.js"
+    "copy:web": "node -e \"const fs=require('fs-extra'); fs.ensureDirSync('dist/web'); fs.copySync('src/web/.next', 'dist/web/.next'); fs.copySync('src/web/public', 'dist/web/public'); fs.copyFileSync('src/web/next.config.ts', 'dist/web/next.config.js'); fs.copyFileSync('src/web/package.json', 'dist/web/package.json');\"",
+    "optimize:web": "node -e \"const fs=require('fs-extra'); const path=require('path'); const distWeb='dist/web/.next'; if(fs.existsSync(distWeb+'/cache')) fs.removeSync(distWeb+'/cache'); if(fs.existsSync(distWeb+'/build')) { const buildFiles=fs.readdirSync(distWeb+'/build/chunks').filter(f=>f.endsWith('.map')); buildFiles.forEach(f=>fs.removeSync(path.join(distWeb+'/build/chunks',f))); } const serverChunks=distWeb+'/server/chunks'; if(fs.existsSync(serverChunks)) { fs.readdirSync(serverChunks,{recursive:true}).filter(f=>f.endsWith('.map')).forEach(f=>fs.removeSync(path.join(serverChunks,f))); }\"",
+    "build": "npm run build:cli && npm run build:web && npm run copy:web && npm run optimize:web",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist web",
+    "prepublishOnly": "npm run clean && npm run build",
+    "prepack": "npm run build"
   },
   "keywords": [
     "aws",
@@ -36,6 +37,20 @@
   ],
   "author": "dev-luch",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dev-luch/ses-pilot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dev-luch/ses-pilot/issues"
+  },
+  "homepage": "https://github.com/dev-luch/ses-pilot#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^24.3.0",

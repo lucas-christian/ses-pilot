@@ -1,4 +1,34 @@
-.language_config.json
-node_modules
-npm-debug.log*
-.DS_Store
+# Source files
+src/
+tsconfig*.json
+eslint.config.mjs
+
+# Development files
+.env*
+.vscode/
+.cursor/
+.git/
+.gitignore
+
+# Build artifacts (except dist/ and web/)
+node_modules/
+*.log
+*.tmp
+
+# Config files for development
+ses-pilot.config.json
+ses-templates/
+
+# Documentation
+README.md
+docs/
+
+# Test files
+test/
+tests/
+**/*.test.*
+**/*.spec.*
+
+# Workspace specific
+src/web/node_modules/
+src/web/.next/

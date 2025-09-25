@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useFolderManager } from './use-folder-manager';
+import { useFileManager } from './use-file-manager';
 import { useLocalTemplates } from './use-local-templates';
 
 export interface HierarchicalItem {
@@ -14,8 +14,9 @@ export interface HierarchicalItem {
 }
 
 export function useHierarchicalFolders() {
-  const { folders, createFolder, createTemplate, isLoading, error } = useFolderManager();
-  const { templates } = useLocalTemplates();
+  // const { folders, createFolder, createTemplate, isLoading, error } = useFileManager();
+  const { templates, isLoading, error } = useFileManager();
+  const { templates: localTemplates } = useLocalTemplates();
   const [hierarchicalItems, setHierarchicalItems] = useState<HierarchicalItem[]>([]);
 
   // Converter estrutura de pastas para hierárquica
@@ -30,32 +31,33 @@ export function useHierarchicalFolders() {
         children: []
       };
 
-      // Adicionar pastas como filhos do root
-      const folderItems: HierarchicalItem[] = folders.map(folder => ({
-        id: folder.id,
-        name: folder.name,
-        type: 'folder',
-        isExpanded: false,
-        children: [],
+      // Adicionar pastas como filhos do root (por enquanto vazio até implementar folders)
+      const folderItems: HierarchicalItem[] = [];
+
+      // Adicionar templates locais como filhos do root
+      const templateItems: HierarchicalItem[] = templates.map((template: { id: string; name: string; path: string }) => ({
+        id: `template-${template.path || template.id}`,
+        name: template.name,
+        type: 'template',
         parentId: 'ses-templates'
       }));
 
-      // Adicionar templates locais como filhos do root
-      const templateItems: HierarchicalItem[] = templates.map(template => ({
-        id: `template-${template.path}`,
+      // Adicionar templates locais também
+      const localTemplateItems: HierarchicalItem[] = localTemplates.map((template) => ({
+        id: `local-template-${template.path}`,
         name: template.name,
         type: 'template',
         parentId: 'ses-templates'
       }));
 
       // Adicionar todos os itens como filhos do root
-      rootItem.children = [...folderItems, ...templateItems];
+      rootItem.children = [...folderItems, ...templateItems, ...localTemplateItems];
 
       return [rootItem];
     };
 
     setHierarchicalItems(buildHierarchy());
-  }, [folders, templates]);
+  }, [localTemplates, templates]);
 
   const toggleFolder = (folderId: string) => {
     setHierarchicalItems(prev => {
@@ -76,12 +78,14 @@ export function useHierarchicalFolders() {
 
   const handleCreateFolder = async (parentId: string) => {
     const folderName = `Nova Pasta ${Date.now()}`;
-    await createFolder(parentId, folderName);
+    // await createFolder(parentId, folderName);
+    console.log('Create folder not implemented:', parentId, folderName);
   };
 
   const handleCreateTemplate = async (parentId: string) => {
     const templateName = `Novo Template ${Date.now()}`;
-    await createTemplate(parentId, templateName);
+    // await createTemplate(parentId, templateName);
+    console.log('Create template not implemented:', parentId, templateName);
   };
 
   return {

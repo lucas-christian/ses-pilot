@@ -46,7 +46,7 @@ function VerificationTemplatesSection() {
   };
 
   const handleTemplateDelete = (templateId: string) => {
-    const template = templates.find(t => t.id === templateId);
+    const template = templates.find((t: { id: string; name: string }) => t.id === templateId);
     if (template) {
       setDeleteModal({
         isOpen: true,
@@ -224,10 +224,10 @@ function VerificationTemplatesSection() {
                   />
                 )}
                 <div className="space-y-1 min-h-32">
-                  {templates.map((template) => (
+                  {templates.map((template: { id: string; name: string }) => (
                     <TemplateItem
                       key={template.id}
-                      template={template}
+                      template={template as { id: string; name: string; path: string }}
                       onTemplateClick={handleTemplateClick}
                       onTemplateDelete={handleTemplateDelete}
                     />

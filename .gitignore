@@ -4,3 +4,6 @@ npm-debug.log*
 .DS_Store
 ses-templates/
 ses-pilot.config.json
+web/
+dist/
+*.tgz

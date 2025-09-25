@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { Command } from 'commander';
 import chalk from 'chalk';
 import inquirer from 'inquirer';
@@ -140,7 +141,8 @@ program.command('start')
     process.env.SES_PILOT_TEMPLATES_PATH = config.templatesPath;
 
     try {
-      const webAppPath = path.resolve(__dirname, '../src/web');
+      // Em produção, o web app estará no diretório dist/web
+      const webAppPath = path.resolve(__dirname, './web');
       const port = await portfinder.getPortPromise({ port: 5359 });
 
       console.log(chalk.green('🚀 Iniciando a interface web... (Isso pode levar um momento)'));
