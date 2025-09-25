@@ -1,4 +1,5 @@
 import { minify } from 'html-minifier-terser';
+import { html } from 'js-beautify';
 
 // Função para normalizar caracteres especiais para entidades HTML
 function normalizeSpecialCharacters(text: string): string {
@@ -28,6 +29,32 @@ export function decodeHtmlEntities(text: string): string {
     const charCode = parseInt(code, 10);
     return String.fromCharCode(charCode);
   });
+}
+
+// Função para formatar HTML de forma bonita (como Ctrl+Shift+F do VSCode)
+export function formatHtml(htmlContent: string): string {
+  if (!htmlContent) return '';
+  
+  try {
+    return html(htmlContent, {
+      indent_size: 2,
+      indent_char: ' ',
+      max_preserve_newlines: 1,
+      preserve_newlines: true,
+      indent_scripts: 'normal',
+      end_with_newline: false,
+      wrap_line_length: 0,
+      indent_inner_html: true,
+      indent_empty_lines: false,
+      wrap_attributes: 'auto',
+      extra_liners: ['head', 'body', '/html'],
+      inline: ['title', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'span', 'strong', 'em', 'b', 'i', 'u'],
+      void_elements: ['br', 'hr', 'img', 'input', 'meta', 'link', 'area', 'base', 'col', 'embed', 'source', 'track', 'wbr']
+    });
+  } catch (error) {
+    console.error('Erro ao formatar HTML:', error);
+    return htmlContent;
+  }
 }
 
 // Função para minificar HTML

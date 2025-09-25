@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { deleteTemplate, getTemplateDetails, updateTemplate } from '@/lib/file-system';
 import { getTemplatesPath } from '@/lib/config';
 import { deployVerificationTemplate } from '@/lib/aws';
-import { minifyHtml, normalizeFromEmailAddress, normalizeText, decodeHtmlEntities } from '@/lib/template-utils';
+import { minifyHtml, normalizeFromEmailAddress, normalizeText, decodeHtmlEntities, formatHtml } from '@/lib/template-utils';
 import fs from 'fs-extra';
 import path from 'path';
 
@@ -45,8 +45,9 @@ export async function GET(
         }
       }
       
-      // Decodifica entidades HTML para exibição
+      // Decodifica entidades HTML e formata para exibição
       const decodedHtmlContent = decodeHtmlEntities(htmlContent);
+      const formattedHtmlContent = formatHtml(decodedHtmlContent);
       const decodedTemplateJson = {
         ...templateJson,
         Template: {
@@ -56,7 +57,7 @@ export async function GET(
         FromEmailAddress: decodeHtmlEntities(templateJson.FromEmailAddress || '')
       };
       
-      return NextResponse.json({ htmlContent: decodedHtmlContent, templateJson: decodedTemplateJson });
+      return NextResponse.json({ htmlContent: formattedHtmlContent, templateJson: decodedTemplateJson });
     }
     
     // Se não encontrar como arquivo direto, tenta a estrutura de pastas _verification
