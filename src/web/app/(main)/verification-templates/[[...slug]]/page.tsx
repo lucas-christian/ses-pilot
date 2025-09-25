@@ -543,10 +543,18 @@ export default function VerificationTemplatePage() {
             </div>
           </div>
           <DialogFooter className="p-6 pt-0 flex-shrink-0">
-            <Button variant="outline" onClick={() => setShowHtmlEditor(false)}>
+            <Button variant="outline" onClick={() => {
+              setShowHtmlEditor(false);
+              setShowMaximizedHtmlEditor(false);
+              setShowMaximizedPreview(false);
+            }}>
               Fechar
             </Button>
-            <Button onClick={() => setShowHtmlEditor(false)}>
+            <Button onClick={() => {
+              setShowHtmlEditor(false);
+              setShowMaximizedHtmlEditor(false);
+              setShowMaximizedPreview(false);
+            }}>
               Salvar e Fechar
             </Button>
           </DialogFooter>
@@ -589,10 +597,18 @@ export default function VerificationTemplatePage() {
             </div>
           </div>
           <DialogFooter className="p-6 pt-2 flex-shrink-0">
-            <Button variant="outline" onClick={() => setShowMaximizedHtmlEditor(false)}>
+            <Button variant="outline" onClick={() => {
+              setShowMaximizedHtmlEditor(false);
+              setShowHtmlEditor(false);
+              setShowMaximizedPreview(false);
+            }}>
               Fechar
             </Button>
-            <Button onClick={() => setShowMaximizedHtmlEditor(false)}>
+            <Button onClick={() => {
+              setShowMaximizedHtmlEditor(false);
+              setShowHtmlEditor(false);
+              setShowMaximizedPreview(false);
+            }}>
               Salvar e Fechar
             </Button>
           </DialogFooter>
