@@ -86,33 +86,48 @@ export async function deployVerificationTemplate(templateDetails: {
   const os = await import('os');
 
   try {
-    // Prepara o payload para o template de verificação
+    const templateName = templateDetails.templateJson.Template.TemplateName;
+    
+    // Prepara o payload usando a estrutura do template JSON
+    const templateData = templateDetails.templateJson as Record<string, unknown>;
     const verificationPayload = {
-      TemplateName: templateDetails.templateJson.Template.TemplateName,
-      FromEmailAddress: process.env.AWS_SES_FROM_EMAIL || 'noreply@example.com',
+      TemplateName: templateName,
+      FromEmailAddress: templateData.FromEmailAddress || process.env.AWS_SES_FROM_EMAIL || 'noreply@example.com',
       TemplateSubject: templateDetails.templateJson.Template.SubjectPart,
-      TemplateContent: {
-        Html: templateDetails.htmlContent || templateDetails.templateJson.Template.HtmlPart || '',
-        Text: templateDetails.templateJson.Template.TextPart || ''
-      },
-      SuccessRedirectionURL: process.env.AWS_SES_SUCCESS_REDIRECT_URL || '',
-      FailureRedirectionURL: process.env.AWS_SES_FAILURE_REDIRECT_URL || ''
+      TemplateContent: templateDetails.htmlContent || templateData.HtmlPart || '',
+      SuccessRedirectionURL: templateData.SuccessRedirectionURL || process.env.AWS_SES_SUCCESS_REDIRECT_URL || '',
+      FailureRedirectionURL: templateData.FailureRedirectionURL || process.env.AWS_SES_FAILURE_REDIRECT_URL || ''
     };
 
-    // Salva o payload em arquivo temporário
+    // Salva o payload em arquivo temporário preservando Unicode escapes literalmente
     const tempJsonPath = path.join(os.tmpdir(), `ses-verification-template-${Date.now()}.json`);
-    await fs.writeJson(tempJsonPath, verificationPayload);
+    
+    // Cria JSON manualmente para preservar Unicode escapes literais
+    const jsonContent = `{
+  "TemplateName": "${verificationPayload.TemplateName}",
+  "FromEmailAddress": "${verificationPayload.FromEmailAddress}",
+  "TemplateSubject": "${verificationPayload.TemplateSubject}",
+  "TemplateContent": "${String(verificationPayload.TemplateContent).replace(/"/g, '\\"')}",
+  "SuccessRedirectionURL": "${verificationPayload.SuccessRedirectionURL}",
+  "FailureRedirectionURL": "${verificationPayload.FailureRedirectionURL}"
+}`;
+    
+    await fs.writeFile(tempJsonPath, jsonContent, 'utf8');
 
     try {
-      // Executa o comando de criação/atualização do template de verificação
+      // Primeiro, verifica se o template já existe
+      await execa('aws', ['sesv2', 'get-custom-verification-email-template', '--template-name', templateName]);
+      
+      // Se chegou aqui, o template existe, então atualiza
+      console.log(`Template ${templateName} já existe. Atualizando...`);
+      await execa('aws', ['sesv2', 'update-custom-verification-email-template', '--cli-input-json', `file://${tempJsonPath}`]);
+      console.log(`Template ${templateName} atualizado com sucesso.`);
+      
+    } catch {
+      // Se não conseguir buscar o template, significa que não existe, então cria
+      console.log(`Template ${templateName} não existe. Criando novo...`);
       await execa('aws', ['sesv2', 'create-custom-verification-email-template', '--cli-input-json', `file://${tempJsonPath}`]);
-    } catch (createError) {
-      // Se falhar na criação, tenta atualizar
-      try {
-        await execa('aws', ['sesv2', 'update-custom-verification-email-template', '--cli-input-json', `file://${tempJsonPath}`]);
-      } catch {
-        throw createError; // Re-throw o erro original se ambos falharem
-      }
+      console.log(`Template ${templateName} criado com sucesso.`);
     } finally {
       // Remove o arquivo temporário
       try {

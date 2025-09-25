@@ -1,17 +1,17 @@
 import { minify } from 'html-minifier-terser';
 import { html } from 'js-beautify';
 
-// Função para normalizar caracteres especiais para entidades HTML
-function normalizeSpecialCharacters(text: string): string {
+// Função para normalizar caracteres especiais para Unicode escape (\u00e7)
+function normalizeToUnicodeEscape(text: string): string {
   const result: string[] = [];
   
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
     const code = char.charCodeAt(0);
     
-    // Se o caractere é maior que 127 (ASCII estendido), converte para entidade HTML
+    // Se o caractere é maior que 127 (ASCII estendido), converte para Unicode escape
     if (code > 127) {
-      result.push(`&#${code};`);
+      result.push(`\\u${code.toString(16).padStart(4, '0')}`);
     } else {
       result.push(char);
     }
@@ -25,10 +25,18 @@ export function decodeHtmlEntities(text: string): string {
   if (!text) return '';
   
   // Converte entidades numéricas &#DDD; de volta para caracteres UTF-8
-  return text.replace(/&#(\d+);/g, (match, code) => {
+  let decoded = text.replace(/&#(\d+);/g, (match, code) => {
     const charCode = parseInt(code, 10);
     return String.fromCharCode(charCode);
   });
+  
+  // Converte Unicode escapes \uXXXX de volta para caracteres UTF-8
+  decoded = decoded.replace(/\\u([0-9a-fA-F]{4})/g, (match, hex) => {
+    const charCode = parseInt(hex, 16);
+    return String.fromCharCode(charCode);
+  });
+  
+  return decoded;
 }
 
 // Função para formatar HTML de forma bonita (como Ctrl+Shift+F do VSCode)
@@ -60,8 +68,8 @@ export function formatHtml(htmlContent: string): string {
 // Função para minificar HTML
 export async function minifyHtml(htmlContent: string): Promise<string> {
   try {
-    // Primeiro normaliza caracteres especiais
-    const normalizedHtml = normalizeSpecialCharacters(htmlContent);
+    // Primeiro normaliza caracteres especiais para Unicode escape
+    const normalizedHtml = normalizeToUnicodeEscape(htmlContent);
     
     // Depois minifica
     return await minify(normalizedHtml, {
@@ -82,12 +90,12 @@ export async function minifyHtml(htmlContent: string): Promise<string> {
   }
 }
 
-// Função para normalizar texto (assunto, e-mail, etc.)
+// Função para normalizar texto (assunto, e-mail, etc.) para Unicode escape
 export function normalizeText(text: string): string {
   if (!text) return '';
   
-  // Primeiro normaliza caracteres especiais
-  const normalized = normalizeSpecialCharacters(text);
+  // Primeiro normaliza caracteres especiais para Unicode escape
+  const normalized = normalizeToUnicodeEscape(text);
   
   // Depois normaliza espaços
   return normalized.trim().replace(/\s+/g, ' ');

@@ -182,13 +182,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
           );
         }
 
-        // Carrega os detalhes do template de verificação
-        const verificationPath = ['_verification', ...slug];
-        const templateDetails = await getTemplateDetails(templatesPath, verificationPath);
+        // Verifica se o template de verificação existe localmente
+        const fs = await import('fs-extra');
+        const path = await import('path');
         
-        if (!templateDetails) {
+        const templateName = slug.join('/');
+        const fileName = `${templateName}.verification.json`;
+        const filePath = path.join(templatesPath, fileName);
+        
+        if (!(await fs.pathExists(filePath))) {
           return NextResponse.json(
-            { error: 'Template de verificação não encontrado.' },
+            { error: 'Template de verificação não encontrado localmente.' },
             { status: 404 }
           );
         }
@@ -204,16 +208,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
           );
         }
 
-        // Prepara o payload para envio de teste de verificação
+        // Prepara o payload para envio de teste de verificação (estrutura do send-email.json)
         const testEmailPayload = {
           EmailAddress: email,
-          TemplateName: slug.join('/'),
-          ConfigurationSetName: undefined // Opcional
+          TemplateName: slug.join('/')
         };
 
         // Salva o payload em arquivo temporário
-        const fs = await import('fs-extra');
-        const path = await import('path');
         const os = await import('os');
         
         const tempJsonPath = path.join(os.tmpdir(), `ses-test-verification-email-${Date.now()}.json`);
@@ -276,13 +277,87 @@ export async function POST(request: Request, { params }: { params: Promise<{ slu
           success: true, 
           message: `Template de verificação "${slug.join('/')}" enviado para a AWS com sucesso.` 
         });
+      },
+      'pull': async () => {
+        // Puxa o template específico da AWS
+        const templateName = slug.join('/');
+        const { getRemoteTemplateContent } = await import('@/lib/aws');
+        
+        try {
+          // Busca o conteúdo do template na AWS
+          const templateContent = await getRemoteTemplateContent(templateName);
+          
+          // Cria o nome do arquivo: template-name.verification.json
+          const fileName = `${templateName}.verification.json`;
+          const filePath = path.join(templatesPath, fileName);
+          
+          let existingTemplate = {};
+          
+          // Tenta ler o arquivo existente
+          if (await fs.pathExists(filePath)) {
+            try {
+              existingTemplate = await fs.readJson(filePath);
+            } catch (error) {
+              console.warn(`Erro ao ler arquivo existente ${fileName}:`, error);
+              // Se não conseguir ler, usa um template vazio
+            }
+          }
+          
+          // Atualiza apenas o SubjectPart e HtmlPart, preservando o resto
+          const updatedTemplate = {
+            ...existingTemplate,
+            Template: {
+              ...((existingTemplate as Record<string, unknown>).Template || {}),
+              TemplateName: templateName,
+              SubjectPart: templateContent.Subject || 'Assunto do Template',
+            },
+            HtmlPart: templateContent.Html || '<h1>Template HTML não encontrado</h1>'
+          };
+          
+          // Salva o arquivo atualizado
+          await fs.writeJson(filePath, updatedTemplate, { spaces: 2 });
+          
+          // Decodifica entidades HTML e formata para exibição (mesmo processo do GET)
+          const { decodeHtmlEntities, formatHtml } = await import('@/lib/template-utils');
+          
+          const decodedHtmlContent = decodeHtmlEntities(updatedTemplate.HtmlPart || '');
+          const formattedHtmlContent = formatHtml(decodedHtmlContent);
+          
+          const decodedTemplateJson = {
+            ...updatedTemplate,
+            Template: {
+              ...(updatedTemplate.Template as Record<string, unknown>),
+              SubjectPart: decodeHtmlEntities((updatedTemplate.Template as Record<string, unknown>)?.SubjectPart as string || '')
+            },
+            FromEmailAddress: decodeHtmlEntities((updatedTemplate as Record<string, unknown>).FromEmailAddress as string || '')
+          };
+          
+          // Retorna no formato esperado pelo frontend (mesmo formato do GET)
+          const frontendTemplate = {
+            htmlContent: formattedHtmlContent,
+            templateJson: decodedTemplateJson
+          };
+          
+          return NextResponse.json({
+            success: true,
+            message: `Template "${templateName}" puxado da AWS com sucesso!`,
+            ...frontendTemplate
+          });
+          
+        } catch (error) {
+          console.error(`Erro ao puxar template ${templateName}:`, error);
+          return NextResponse.json(
+            { error: `Falha ao puxar template "${templateName}" da AWS.` },
+            { status: 500 }
+          );
+        }
       }
     };
 
     const execAction = actions[action as keyof typeof actions];
     if (!execAction) {
       return NextResponse.json(
-        { error: `Ação '${action}' não encontrada. Ações disponíveis: test-email, update, deploy` },
+        { error: `Ação '${action}' não encontrada. Ações disponíveis: test-email, update, deploy, pull` },
         { status: 400 }
       );
     }
