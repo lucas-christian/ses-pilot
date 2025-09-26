@@ -19,13 +19,12 @@
     "dev": "concurrently \"npm:dev:cli\" \"npm:dev:web\"",
     "build:cli": "tsc --project tsconfig.cli.json",
     "build:web": "npm run build --workspace=src/web",
-    "copy:web": "node -e \"const fs=require('fs-extra'); fs.ensureDirSync('dist/web'); fs.copySync('src/web/.next', 'dist/web/.next'); fs.copySync('src/web/public', 'dist/web/public'); fs.copyFileSync('src/web/next.config.ts', 'dist/web/next.config.js'); fs.copyFileSync('src/web/package.json', 'dist/web/package.json');\"",
+    "copy:web": "node -e \"const fs=require('fs-extra'); fs.ensureDirSync('dist/web'); fs.copySync('src/web/.next', 'dist/web/.next'); fs.copySync('src/web/public', 'dist/web/public'); fs.writeFileSync('dist/web/next.config.js', 'module.exports = {};'); fs.copyFileSync('src/web/package.json', 'dist/web/package.json');\"",
     "optimize:web": "node -e \"const fs=require('fs-extra'); const path=require('path'); const distWeb='dist/web/.next'; if(fs.existsSync(distWeb+'/cache')) fs.removeSync(distWeb+'/cache'); if(fs.existsSync(distWeb+'/build')) { const buildFiles=fs.readdirSync(distWeb+'/build/chunks').filter(f=>f.endsWith('.map')); buildFiles.forEach(f=>fs.removeSync(path.join(distWeb+'/build/chunks',f))); } const serverChunks=distWeb+'/server/chunks'; if(fs.existsSync(serverChunks)) { fs.readdirSync(serverChunks,{recursive:true}).filter(f=>f.endsWith('.map')).forEach(f=>fs.removeSync(path.join(serverChunks,f))); }\"",
     "build": "npm run build:cli && npm run build:web && npm run copy:web && npm run optimize:web",
     "start": "node dist/index.js",
     "clean": "rm -rf dist web",
-    "prepublishOnly": "npm run clean && npm run build",
-    "prepack": "npm run build"
+    "prepublishOnly": "npm run clean && npm run build"
   },
   "keywords": [
     "aws",

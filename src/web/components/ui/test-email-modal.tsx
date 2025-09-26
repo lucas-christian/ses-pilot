@@ -15,7 +15,11 @@ interface TestEmailModalProps {
   children: React.ReactNode;
 }
 
-export function TestEmailModal({ templatePath, isVerification = false, children }: TestEmailModalProps) {
+export function TestEmailModal({
+  templatePath,
+  // isVerification = false,
+  children }: TestEmailModalProps
+) {
   const { locale } = useLanguage();
   const { t } = useTranslation(locale);
   const [isOpen, setIsOpen] = useState(false);

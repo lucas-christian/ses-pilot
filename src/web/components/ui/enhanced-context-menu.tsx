@@ -26,7 +26,7 @@ export function EnhancedContextMenu({
   onClose,
   onAction,
   itemType,
-  isRoot = false,
+  // isRoot = false,
   onInlineEdit,
   isRootFolder = false
 }: EnhancedContextMenuProps) {

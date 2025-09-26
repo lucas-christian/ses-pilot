@@ -9,6 +9,11 @@ import next from 'next';
 import http from 'http';
 import portfinder from 'portfinder';
 import { parse } from 'url';
+import { fileURLToPath } from 'url';
+
+// Para compatibilidade com módulos ES
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 process.env.NEXT_PRIVATE_EXPERIMENTAL_HIDE_THE_TRACE = '1';
 
@@ -24,84 +29,84 @@ program.command('init')
   .action(async () => {
     console.log(chalk.blue.bold('✈️  Bem-vindo à configuração do SES Pilot!'));
 
-    const answers = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'mode',
-        message: 'Como você prefere gerenciar seus templates?',
-        choices: [
-          { name: 'Local: Gerenciar templates apenas para o projeto atual.', value: 'local' },
-          { name: 'Global: Manter uma biblioteca central de templates.', value: 'global' },
-        ],
-      },
-      {
-        type: 'list',
-        name: 'globalPathChoice',
-        message: 'Onde você gostaria de armazenar os arquivos de configuração e templates globais?',
-        choices: [
-          { name: `Padrão: No seu diretório de usuário (${path.join(os.homedir(), '.ses-pilot')})`, value: 'default' },
-          { name: 'Personalizado: Escolher um diretório específico', value: 'custom' }
-        ],
-        when: (answers) => answers.mode === 'global',
-      },
-      {
-        type: 'input',
-        name: 'customGlobalPath',
-        message: 'Por favor, insira o caminho completo para o diretório (ex: /Users/seu-nome/Documentos/ses-templates):',
-        when: (answers) => answers.globalPathChoice === 'custom',
-        validate: (input) => !!input || 'O caminho не pode ser vazio.',
-        filter: (input) => {
-            return input.startsWith('~') ? path.join(os.homedir(), input.slice(1)) : input;
-        }
-      }
-    ]);
+    // const answers = await inquirer.prompt([
+    //   {
+    //     type: 'list',
+    //     name: 'mode',
+    //     message: 'Como você prefere gerenciar seus templates?',
+    //     choices: [
+    //       { name: 'Local: Gerenciar templates apenas para o projeto atual.', value: 'local' },
+    //       { name: 'Global: Manter uma biblioteca central de templates.', value: 'global' },
+    //     ],
+    //   },
+    //   {
+    //     type: 'list',
+    //     name: 'globalPathChoice',
+    //     message: 'Onde você gostaria de armazenar os arquivos de configuração e templates globais?',
+    //     choices: [
+    //       { name: `Padrão: No seu diretório de usuário (${path.join(os.homedir(), '.ses-pilot')})`, value: 'default' },
+    //       { name: 'Personalizado: Escolher um diretório específico', value: 'custom' }
+    //     ],
+    //     when: (answers) => answers.mode === 'global',
+    //   },
+    //   {
+    //     type: 'input',
+    //     name: 'customGlobalPath',
+    //     message: 'Por favor, insira o caminho completo para o diretório (ex: /Users/seu-nome/Documentos/ses-templates):',
+    //     when: (answers) => answers.globalPathChoice === 'custom',
+    //     validate: (input) => !!input || 'O caminho не pode ser vazio.',
+    //     filter: (input) => {
+    //         return input.startsWith('~') ? path.join(os.homedir(), input.slice(1)) : input;
+    //     }
+    //   }
+    // ]);
 
     try {
-      if (answers.mode === 'local') {
-        const configPath = path.resolve(process.cwd(), 'ses-pilot.config.json');
-        const templatesPath = path.resolve(process.cwd(), 'ses-templates');
+      // if (answers.mode === 'local') {
+      const configPath = path.resolve(process.cwd(), 'ses-pilot.config.json');
+      const templatesPath = path.resolve(process.cwd(), 'ses-templates');
 
-        if (await fs.pathExists(configPath)) {
-          console.log(chalk.yellow('Já existe um arquivo de configuração local. Nenhuma alteração foi feita.'));
-          return;
-        }
-
-        const config = {
-          mode: 'local',
-          templatesPath: './ses-templates',
-        };
-
-        await fs.writeJson(configPath, config, { spaces: 2 });
-        await fs.ensureDir(templatesPath);
-        
-        console.log(chalk.green('✔️ Configuração local criada com sucesso!'));
-        console.log(chalk.cyan(`   - Arquivo de configuração: ${configPath}`));
-        console.log(chalk.cyan(`   - Pasta de templates: ${templatesPath}`));
-
-      } else if (answers.mode === 'global') {
-        const globalDir = answers.globalPathChoice === 'custom'
-          ? path.resolve(answers.customGlobalPath)
-          : path.join(os.homedir(), '.ses-pilot');
-
-        const configPath = path.join(globalDir, 'config.json');
-        const templatesPath = path.join(globalDir, 'templates');
-
-        if (await fs.pathExists(configPath)) {
-          console.log(chalk.yellow(`A configuração global já existe em ${globalDir}. Nenhuma alteração foi feita.`));
-          return;
-        }
-
-        await fs.ensureDir(templatesPath); 
-
-        const config = {
-          mode: 'global',
-          templatesPath: templatesPath,
-        };
-        await fs.writeJson(configPath, config, { spaces: 2 });
-
-        console.log(chalk.green('✔️ Configuração global criada com sucesso!'));
-        console.log(chalk.cyan(`   - Arquivos de configuração e templates estão em: ${globalDir}`));
+      if (await fs.pathExists(configPath)) {
+        console.log(chalk.yellow('Já existe um arquivo de configuração local. Nenhuma alteração foi feita.'));
+        return;
       }
+
+      const config = {
+        mode: 'local',
+        templatesPath: './ses-templates',
+      };
+
+      await fs.writeJson(configPath, config, { spaces: 2 });
+      await fs.ensureDir(templatesPath);
+      
+      console.log(chalk.green('✔️ Configuração local criada com sucesso!'));
+      console.log(chalk.cyan(`   - Arquivo de configuração: ${configPath}`));
+      console.log(chalk.cyan(`   - Pasta de templates: ${templatesPath}`));
+
+      // } else if (answers.mode === 'global') {
+      //   const globalDir = answers.globalPathChoice === 'custom'
+      //     ? path.resolve(answers.customGlobalPath)
+      //     : path.join(os.homedir(), '.ses-pilot');
+
+      //   const configPath = path.join(globalDir, 'config.json');
+      //   const templatesPath = path.join(globalDir, 'templates');
+
+      //   if (await fs.pathExists(configPath)) {
+      //     console.log(chalk.yellow(`A configuração global já existe em ${globalDir}. Nenhuma alteração foi feita.`));
+      //     return;
+      //   }
+
+      //   await fs.ensureDir(templatesPath); 
+
+      //   const config = {
+      //     mode: 'global',
+      //     templatesPath: templatesPath,
+      //   };
+      //   await fs.writeJson(configPath, config, { spaces: 2 });
+
+      //   console.log(chalk.green('✔️ Configuração global criada com sucesso!'));
+      //   console.log(chalk.cyan(`   - Arquivos de configuração e templates estão em: ${globalDir}`));
+      // }
     } catch (error: any) {
         if (error.code === 'EACCES') {
             console.error(chalk.red('\n❌ Erro de Permissão!'));

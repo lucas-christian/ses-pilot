@@ -74,8 +74,8 @@ export async function PUT(request: NextRequest) {
     
     // Se templatesPath foi atualizado, converter para relativo se necessário
     if (updates.templatesPath) {
-      const configSourcePath = join(CONFIG_PATH, '..');
-      const relativePath = join(configSourcePath, updates.templatesPath);
+      // const configSourcePath = join(CONFIG_PATH, '..');
+      // const relativePath = join(configSourcePath, updates.templatesPath);
       updatedConfig.templatesPath = updates.templatesPath;
     }
     
