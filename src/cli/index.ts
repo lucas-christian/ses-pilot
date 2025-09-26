@@ -147,7 +147,7 @@ program.command('start')
 
     try {
       // Em produção, o web app estará no diretório dist/web
-      const webAppPath = path.resolve(__dirname, './web');
+      const webAppPath = path.resolve(__dirname, 'web');
       const port = await portfinder.getPortPromise({ port: 5359 });
 
       console.log(chalk.green('🚀 Iniciando a interface web... (Isso pode levar um momento)'));
